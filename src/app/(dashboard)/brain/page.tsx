@@ -2,16 +2,29 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Sparkles } from "lucide-react";
+import { Pencil, Plus, Sparkles, Trash } from "lucide-react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { ChatWindow } from "@/components/brain/chat-window";
 import { ModePicker } from "@/components/brain/mode-picker";
 import { mockConversations, messagesFor } from "@/mock/data";
 import { timeAgo } from "@/lib/utils/format";
 import { BRAIN_MODES } from "@/lib/utils/constants";
+import type { Conversation } from "@/lib/types";
 
 export default function BrainPage() {
   return (
@@ -24,48 +37,140 @@ export default function BrainPage() {
 function BrainView() {
   const params = useSearchParams();
   const queryMode = params.get("mode") ?? "global";
-  const [activeId, setActiveId] = useState<string | null>(mockConversations[0]?.id ?? null);
-  const [mode, setMode] = useState(queryMode);
 
-  const active = mockConversations.find((c) => c.id === activeId);
+  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
+  const [mode, setMode] = useState(queryMode);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const active = conversations.find((c) => c.id === activeId);
   const initialMessages = active ? messagesFor(active.id) : [];
+
+  function startRename(c: Conversation) {
+    setRenamingId(c.id);
+    setRenameValue(c.title);
+  }
+  function commitRename() {
+    if (!renamingId) return;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === renamingId ? { ...c, title: renameValue.trim() || c.title } : c)),
+    );
+    setRenamingId(null);
+    toast.success("Renamed");
+  }
+  function confirmDelete() {
+    if (!deletingId) return;
+    setConversations((prev) => prev.filter((c) => c.id !== deletingId));
+    if (activeId === deletingId) setActiveId(null);
+    setDeletingId(null);
+    toast.success("Conversation deleted");
+  }
+  function newConversation() {
+    const id = `conv_local_${Date.now()}`;
+    const fresh: Conversation = {
+      id,
+      userId: "user_andrei",
+      brainMode: mode,
+      contextRefs: {},
+      title: "Untitled conversation",
+      lastMessageAt: new Date().toISOString(),
+      messageCount: 0,
+    };
+    setConversations((prev) => [fresh, ...prev]);
+    setActiveId(id);
+  }
 
   return (
     <div className="grid h-[calc(100vh-7rem)] gap-3 lg:grid-cols-[260px_1fr]">
       <Card className="flex flex-col border-slate-800 bg-slate-900/40">
         <div className="flex items-center justify-between border-b border-slate-800 p-3">
           <span className="text-sm font-semibold">Conversations</span>
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setActiveId(null)}>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={newConversation} aria-label="New conversation">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
         <ScrollArea className="flex-1">
           <div className="space-y-1 p-2">
-            {mockConversations.map((c) => {
+            {conversations.length === 0 ? (
+              <div className="rounded-md border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
+                No conversations. Start one with the +.
+              </div>
+            ) : null}
+            {conversations.map((c) => {
               const selected = c.id === activeId;
               const modeMeta = BRAIN_MODES.find((m) => m.value === c.brainMode);
+              const isRenaming = renamingId === c.id;
               return (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => {
-                    setActiveId(c.id);
-                    setMode(c.brainMode);
-                  }}
-                  className={`w-full rounded-md border p-2 text-left text-xs transition ${
+                  className={`group rounded-md border p-2 transition ${
                     selected
-                      ? "border-primary/40 bg-primary/10 text-primary"
+                      ? "border-primary/40 bg-primary/10"
                       : "border-transparent text-slate-300 hover:bg-slate-950"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-[9px] uppercase">
-                      {modeMeta?.label ?? c.brainMode}
-                    </Badge>
-                    <span className="text-[10px] text-slate-500">{timeAgo(c.lastMessageAt)}</span>
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-sm font-medium leading-tight">{c.title}</div>
-                  <div className="text-[10px] text-slate-500">{c.messageCount} messages</div>
-                </button>
+                  <button
+                    onClick={() => {
+                      setActiveId(c.id);
+                      setMode(c.brainMode);
+                    }}
+                    className="block w-full text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-[9px] uppercase">
+                        {modeMeta?.label ?? c.brainMode}
+                      </Badge>
+                      <span className="text-[10px] text-slate-500">{timeAgo(c.lastMessageAt)}</span>
+                    </div>
+                    {isRenaming ? (
+                      <Input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename();
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        onBlur={commitRename}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1 h-7 border-slate-800 bg-slate-950 text-sm"
+                      />
+                    ) : (
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-tight">{c.title}</div>
+                    )}
+                    <div className="text-[10px] text-slate-500">{c.messageCount} messages</div>
+                  </button>
+                  {!isRenaming ? (
+                    <div className="mt-1 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRename(c);
+                        }}
+                        aria-label="Rename"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-rose-300 hover:text-rose-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingId(c.id);
+                        }}
+                        aria-label="Delete"
+                      >
+                        <Trash className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -97,6 +202,21 @@ function BrainView() {
           />
         </div>
       </Card>
+
+      <AlertDialog open={deletingId !== null} onOpenChange={(o) => !o && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes the chat history. The opportunities and signals it referenced are unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
