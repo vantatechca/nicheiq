@@ -1,16 +1,9 @@
-// Inngest webhook handler — wired in Phase H. For now expose a clear placeholder.
-import { NextResponse } from "next/server";
+import { serve } from "inngest/next";
+import { inngest } from "@/inngest/client";
+import { allFunctions } from "@/inngest/functions";
 
-export async function GET() {
-  return NextResponse.json({
-    data: { status: "Inngest endpoint placeholder — wired in Phase H." },
-  });
-}
-
-export async function POST() {
-  return NextResponse.json({ data: { received: true, processed: 0 } });
-}
-
-export async function PUT() {
-  return NextResponse.json({ data: { synced: true } });
-}
+export const { GET, POST, PUT } = serve({
+  client: inngest,
+  functions: allFunctions,
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+});
