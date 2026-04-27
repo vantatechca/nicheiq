@@ -1,0 +1,47 @@
+services:
+  # NicheIQ Next.js web app
+  - type: web
+    name: nicheiq
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run db:generate && npm run build
+    startCommand: npm start
+    envVars:
+      # Database
+      - key: DATABASE_URL
+        sync: false
+
+      # Auth
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+
+      # Mode
+      - key: USE_MOCK
+        value: "false"
+
+      # AI providers
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_DAILY_SPEND_CAP
+        value: "5"
+
+      # Stub values for services not yet configured
+      # (App will warn but core features work without them)
+      - key: OPENROUTER_API_KEY
+        value: ""
+      - key: OPENAI_API_KEY
+        value: ""
+      - key: UPSTASH_REDIS_REST_URL
+        value: ""
+      - key: UPSTASH_REDIS_REST_TOKEN
+        value: ""
+      - key: INNGEST_EVENT_KEY
+        value: ""
+      - key: INNGEST_SIGNING_KEY
+        value: ""
+
+      # Node version
+      - key: NODE_VERSION
+        value: "20"

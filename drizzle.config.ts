@@ -8,7 +8,7 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://placeholder",
+    url: process.env.DATABASE_URL ?? "postgresql://neondb_owner:npg_FacwDn2y9EhZ@ep-square-leaf-ans3cal9-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
   },
   strict: true,
   verbose: true,
