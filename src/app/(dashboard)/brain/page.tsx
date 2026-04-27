@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -14,6 +14,14 @@ import { timeAgo } from "@/lib/utils/format";
 import { BRAIN_MODES } from "@/lib/utils/constants";
 
 export default function BrainPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading Brain…</div>}>
+      <BrainView />
+    </Suspense>
+  );
+}
+
+function BrainView() {
   const params = useSearchParams();
   const queryMode = params.get("mode") ?? "global";
   const [activeId, setActiveId] = useState<string | null>(mockConversations[0]?.id ?? null);
@@ -34,7 +42,7 @@ export default function BrainPage() {
         <ScrollArea className="flex-1">
           <div className="space-y-1 p-2">
             {mockConversations.map((c) => {
-              const active = c.id === activeId;
+              const selected = c.id === activeId;
               const modeMeta = BRAIN_MODES.find((m) => m.value === c.brainMode);
               return (
                 <button
@@ -44,7 +52,7 @@ export default function BrainPage() {
                     setMode(c.brainMode);
                   }}
                   className={`w-full rounded-md border p-2 text-left text-xs transition ${
-                    active
+                    selected
                       ? "border-primary/40 bg-primary/10 text-primary"
                       : "border-transparent text-slate-300 hover:bg-slate-950"
                   }`}
