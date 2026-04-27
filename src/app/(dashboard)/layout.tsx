@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth/options";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { ShortcutsHelp } from "@/components/layout/shortcuts-help";
+import { RecentTracker } from "@/components/layout/recent-tracker";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -19,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </main>
       </div>
       <ShortcutsHelp />
+      <RecentTracker />
     </div>
   );
 }

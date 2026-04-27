@@ -13,6 +13,7 @@ import { ScoreBadge } from "@/components/shared/score-badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
 import { OpportunityCreateDialog } from "@/components/opportunity/create-dialog";
+import { SavedViews, type OpportunityFilters } from "@/components/opportunity/saved-views";
 import { mockOpportunities } from "@/mock/data";
 import {
   NICHE_LIST,
@@ -118,6 +119,18 @@ function OpportunitiesView() {
         description={`${filtered.length} of ${mockOpportunities.length} ranked across niches.`}
         actions={
           <>
+            <SavedViews
+              current={{ niche, type, effort, status, minScore, search, sort } satisfies OpportunityFilters}
+              onLoad={(f) => {
+                setNiche(f.niche);
+                setType(f.type);
+                setEffort(f.effort);
+                setStatus(f.status);
+                setMinScore(f.minScore);
+                setSearch(f.search);
+                setSort(f.sort);
+              }}
+            />
             <Button size="sm" variant="outline" asChild>
               <Link href="/brain">
                 <Sparkles className="mr-1 h-4 w-4" /> Synthesize new

@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Package,
   Sparkles,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import {
   mockCreators,
   mockNiches,
 } from "@/mock/data";
+import { getRecents, type RecentItem } from "./recent-tracker";
 
 interface Result {
   id: string;
@@ -36,8 +38,17 @@ interface Result {
   icon: LucideIcon;
 }
 
+const ICONS: Record<RecentItem["kind"], LucideIcon> = {
+  opportunity: Lightbulb,
+  product: Package,
+  creator: Users,
+  niche: Compass,
+  trend: TrendingUp,
+};
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [recents, setRecents] = useState<RecentItem[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,6 +61,11 @@ export function CommandPalette() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Refresh recents when palette opens
+  useEffect(() => {
+    if (open) setRecents(getRecents());
+  }, [open]);
 
   const opportunities: Result[] = mockOpportunities.slice(0, 60).map((o) => ({
     id: `opp-${o.id}`,
@@ -98,6 +114,24 @@ export function CommandPalette() {
         <CommandInput placeholder="Search opportunities, products, creators, niches…" />
         <CommandList>
           <CommandEmpty>No matches. Try fewer keywords.</CommandEmpty>
+
+          {recents.length > 0 ? (
+            <>
+              <CommandGroup heading="Recently viewed">
+                {recents.map((r) => {
+                  const Icon = ICONS[r.kind] ?? Sparkles;
+                  return (
+                    <CommandItem key={r.href} onSelect={() => go(r.href)}>
+                      <Icon className="h-4 w-4" />
+                      <span className="line-clamp-1">{r.label}</span>
+                      <CommandShortcut>{r.kind}</CommandShortcut>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          ) : null}
 
           <CommandGroup heading="Navigation">
             {NAV_ITEMS.map((item) => {
