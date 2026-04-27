@@ -35,16 +35,11 @@ function LoginForm() {
     const res = await signIn("credentials", { email, password, redirect: false, callbackUrl });
     setLoading(false);
     if (!res || res.error) {
-      setError("Invalid credentials. Try the demo credentials below.");
+      setError("Invalid credentials.");
       return;
     }
     router.push(callbackUrl);
     router.refresh();
-  }
-
-  function quickFill(e: string) {
-    setEmail(e);
-    setPassword("nicheiq123");
   }
 
   return (
@@ -94,7 +89,7 @@ function LoginForm() {
         <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl">
           <CardHeader>
             <CardTitle className="text-2xl">Sign in</CardTitle>
-            <CardDescription>Use your team email or pick a demo account below.</CardDescription>
+            <CardDescription>Use your team email and password.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
@@ -107,7 +102,6 @@ function LoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="andrei@nicheiq.com"
                 />
               </div>
               <div className="space-y-2">
@@ -119,7 +113,6 @@ function LoginForm() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
                 />
               </div>
 
@@ -140,32 +133,6 @@ function LoginForm() {
                 )}
               </Button>
             </form>
-
-            <div className="mt-6 rounded-md border border-slate-800 bg-slate-950/60 p-3 text-xs">
-              <div className="mb-2 font-medium text-slate-300">Demo credentials (mock mode)</div>
-              <ul className="space-y-1 text-slate-400">
-                {[
-                  ["andrei@nicheiq.com", "admin"],
-                  ["editor@nicheiq.com", "editor"],
-                  ["viewer@nicheiq.com", "viewer"],
-                  ["demo@nicheiq.com", "viewer"],
-                ].map(([e, role]) => (
-                  <li key={e} className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      className="text-left text-slate-300 hover:text-primary hover:underline"
-                      onClick={() => quickFill(e!)}
-                    >
-                      {e}
-                    </button>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-500">{role}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 text-[11px] text-slate-500">
-                Password for all demo accounts: <code className="rounded bg-slate-800 px-1">nicheiq123</code>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
