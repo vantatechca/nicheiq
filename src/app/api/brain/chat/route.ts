@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
 import { brainMessageSchema } from "@/lib/utils/validation";
+import { assembleContext } from "@/lib/ai/context-assembler";
+import type { BrainMode } from "@/lib/ai/context-assembler";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const cannedByMode: Record<string, string[]> = {
+const cannedByMode: Record<BrainMode, string[]> = {
   global: [
     "Three weekend-shaped bets jump out from your active feed:",
     "\n\n**1. Etsy printable bundle for 'aesthetic finance'** (score 87) — search up 220% w/w, low competition pocket. Best matched to your 'boost: weekend builds' rule.",
@@ -62,8 +64,8 @@ const cannedByMode: Record<string, string[]> = {
   ],
 };
 
-async function streamCannedResponse(message: string, mode: string): Promise<ReadableStream<Uint8Array>> {
-  const lines = cannedByMode[mode] ?? cannedByMode.global!;
+async function streamCannedResponse(message: string, mode: BrainMode): Promise<ReadableStream<Uint8Array>> {
+  const lines = cannedByMode[mode] ?? cannedByMode.global;
   const acknowledged = `Got it — you said: "${message.slice(0, 160)}${message.length > 160 ? "…" : ""}"\n\n`;
   const fullText = acknowledged + lines.join("");
   const encoder = new TextEncoder();
@@ -75,6 +77,44 @@ async function streamCannedResponse(message: string, mode: string): Promise<Read
         await new Promise((r) => setTimeout(r, 12 + Math.random() * 24));
       }
       controller.close();
+    },
+  });
+}
+
+async function streamRealResponse(opts: {
+  systemPrompt: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  message: string;
+}): Promise<ReadableStream<Uint8Array>> {
+  const { selectModel, checkSpendCap, recordSpend } = await import("@/lib/ai/client");
+  const cap = await checkSpendCap();
+  if (!cap.allowed) {
+    const text = `Daily AI spend cap reached ($${cap.cap}). Try again tomorrow or raise the cap in Settings.`;
+    return new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(text));
+        c.close();
+      },
+    });
+  }
+  const client = selectModel({ tier: 3 });
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of client.stream({
+          system: opts.systemPrompt,
+          messages: [...opts.history, { role: "user", content: opts.message }],
+          maxTokens: 1024,
+        })) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } catch (err) {
+        controller.enqueue(encoder.encode(`\n\n[stream error: ${(err as Error).message}]`));
+      } finally {
+        await recordSpend(0.02);
+        controller.close();
+      }
     },
   });
 }
@@ -93,14 +133,27 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const stream = await streamCannedResponse(parsed.data.message, parsed.data.mode);
+  const useReal = process.env.USE_MOCK === "false" && !!process.env.ANTHROPIC_API_KEY;
   const conversationId = parsed.data.conversationId ?? `conv_${Date.now()}`;
+
+  const stream = useReal
+    ? await streamRealResponse({
+        systemPrompt: assembleContext({
+          mode: parsed.data.mode,
+          refIds: parsed.data.contextRefs,
+          userId: "user_andrei",
+        }),
+        history: [],
+        message: parsed.data.message,
+      })
+    : await streamCannedResponse(parsed.data.message, parsed.data.mode);
 
   return new Response(stream, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       "x-conversation-id": conversationId,
+      "x-ai-mode": useReal ? "live" : "mock",
     },
   });
 }
