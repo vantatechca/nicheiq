@@ -196,6 +196,11 @@ function OpportunitiesView() {
       {selected.size > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
           <span className="font-medium text-primary">{selected.size} selected</span>
+          {selected.size >= 2 && selected.size <= 4 ? (
+            <Button size="sm" asChild>
+              <Link href={`/opportunities/compare?ids=${Array.from(selected).join(",")}`}>Compare</Link>
+            </Button>
+          ) : null}
           <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted")}>
             Shortlist
           </Button>

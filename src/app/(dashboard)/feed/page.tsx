@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bookmark, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Bookmark, Pause, Play, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
@@ -19,8 +19,12 @@ export default function FeedPage() {
   const [niche, setNiche] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
   const [minScore, setMinScore] = useState(0);
+  const [paused, setPaused] = useState(false);
 
-  const { items: liveItems, connected } = useSse<Signal>({ url: "/api/feed/sse" });
+  const { items: liveItems, connected } = useSse<Signal>({
+    url: "/api/feed/sse",
+    enabled: !paused,
+  });
 
   const baseSignals: Signal[] = mockSignals;
   const merged = [...liveItems, ...baseSignals];
@@ -43,20 +47,45 @@ export default function FeedPage() {
     { value: "expired_listing", label: "Expired listing" },
   ];
 
+  const status = paused ? "Paused" : connected ? "Streaming new signals" : "Reconnecting…";
+  const statusDotClass = paused
+    ? "bg-amber-400"
+    : connected
+      ? "animate-pulse-soft bg-emerald-400"
+      : "bg-slate-600";
+
   return (
     <>
       <PageHeader
         title="Live feed"
         description={
           <span className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${connected ? "animate-pulse-soft bg-emerald-400" : "bg-slate-600"}`} />
-            {connected ? "Streaming new signals" : "Reconnecting…"}
+            <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
+            {status}
+            {liveItems.length > 0 ? (
+              <Badge variant="info" className="text-[10px]">
+                {liveItems.length} new
+              </Badge>
+            ) : null}
           </span>
+        }
+        actions={
+          <Button size="sm" variant="outline" onClick={() => setPaused((p) => !p)}>
+            {paused ? (
+              <>
+                <Play className="mr-1 h-4 w-4" /> Resume
+              </>
+            ) : (
+              <>
+                <Pause className="mr-1 h-4 w-4" /> Pause stream
+              </>
+            )}
+          </Button>
         }
       />
 
       <Card className="mb-4 border-slate-800 bg-slate-900/40">
-        <CardContent className="space-y-3 p-4">
+        <div className="space-y-3 p-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Zap className="h-3 w-3 text-amber-400" />
             <span className="text-slate-400">Min score</span>
@@ -77,7 +106,7 @@ export default function FeedPage() {
             emptyLabel="All niches"
           />
           <FilterChips options={signalTypes} value={type} onChange={setType} emptyLabel="All types" />
-        </CardContent>
+        </div>
       </Card>
 
       <div className="space-y-2">
