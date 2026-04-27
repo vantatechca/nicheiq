@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ScoreBadge } from "@/components/shared/score-badge";
-import { Sparkline } from "@/components/shared/sparkline";
+import { RechartsLine } from "@/components/shared/recharts-line";
 import {
   mockKpis,
   mockOpportunities,
@@ -135,13 +135,9 @@ export default function DashboardPage() {
               <div className="text-3xl font-semibold">{mockKpis.avgScore}</div>
               <div className="text-xs text-slate-400">avg</div>
             </div>
-            <Sparkline
-              data={mockKpis.scoreSparkline}
-              width={280}
-              height={64}
-              color="hsl(var(--primary))"
-              className="mt-3 text-primary"
-            />
+            <div className="mt-3">
+              <RechartsLine data={mockKpis.scoreSparkline} height={120} variant="area" />
+            </div>
             <Separator className="my-4 bg-slate-800" />
             <div className="space-y-2">
               {risingTrends.map((t) => (

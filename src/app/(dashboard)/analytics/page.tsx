@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/shared/page-header";
-import { Sparkline } from "@/components/shared/sparkline";
+import { RechartsLine } from "@/components/shared/recharts-line";
+import { RechartsBars } from "@/components/shared/recharts-bars";
 import {
   mockOpportunities,
   mockSources,
@@ -67,10 +68,21 @@ export default function AnalyticsPage() {
               <CardDescription>Rolling average across all active opportunities.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3">
-                <span className="text-3xl font-semibold">{mockKpis.avgScore}</span>
-                <Sparkline data={mockKpis.scoreSparkline} width={420} height={56} color="hsl(var(--primary))" />
-              </div>
+              <div className="mb-2 text-3xl font-semibold">{mockKpis.avgScore}</div>
+              <RechartsLine data={mockKpis.scoreSparkline} height={200} variant="area" />
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6 border-slate-800 bg-slate-900/40">
+            <CardHeader>
+              <CardTitle>Score distribution buckets</CardTitle>
+              <CardDescription>Active opportunities by score band.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RechartsBars
+                data={buckets.map((b) => ({ label: b.label, value: b.count }))}
+                height={220}
+              />
             </CardContent>
           </Card>
         </TabsContent>

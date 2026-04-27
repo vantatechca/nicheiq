@@ -2,6 +2,7 @@
 
 import { signOut, useSession } from "next-auth/react";
 import { Bell, LogOut, Search, Settings, Sparkles, User } from "lucide-react";
+import { ThemeToggle } from "./theme-toggle";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ export function Topbar() {
         <Badge variant="info" className="hidden md:inline-flex">
           <Sparkles className="mr-1 h-3 w-3" /> Brain online
         </Badge>
+        <ThemeToggle />
         <Button variant="ghost" size="icon" aria-label="Notifications">
           <Bell className="h-4 w-4" />
         </Button>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
-import { Sparkline } from "@/components/shared/sparkline";
+import { RechartsLine } from "@/components/shared/recharts-line";
 import { mockTrends } from "@/mock/data";
 import { formatNumber, formatPct } from "@/lib/utils/format";
 import { FilterChips } from "@/components/shared/filter-chips";
@@ -61,10 +61,10 @@ export default function TrendsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Sparkline
+              <RechartsLine
                 data={t.series}
-                width={320}
-                height={56}
+                height={140}
+                variant="area"
                 color={t.growthPct >= 0 ? "rgb(52,211,153)" : "rgb(244,63,94)"}
               />
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
