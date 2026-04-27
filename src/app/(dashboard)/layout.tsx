@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { ShortcutsHelp } from "@/components/layout/shortcuts-help";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -17,6 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="mx-auto w-full max-w-screen-2xl p-4 md:p-6">{children}</div>
         </main>
       </div>
+      <ShortcutsHelp />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ExternalLink, Sparkles, ThumbsDown, ThumbsUp, Workflow } from "lucide-react";
+import { ArrowLeft, ChevronDown, ExternalLink, Printer, Sparkles, ThumbsDown, ThumbsUp, Workflow } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,13 +44,16 @@ export default function OpportunityDetailPage() {
         description={opp.summary}
         actions={
           <>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
+              <Printer className="mr-1 h-4 w-4" /> Print one-pager
+            </Button>
+            <Button variant="outline" size="sm" className="print:hidden">
               <ThumbsUp className="mr-1 h-4 w-4" /> {opp.votes.up}
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="print:hidden">
               <ThumbsDown className="mr-1 h-4 w-4" /> {opp.votes.down}
             </Button>
-            <Button size="sm" asChild>
+            <Button size="sm" asChild className="print:hidden">
               <Link href={`/brain?mode=opportunity&id=${opp.id}`}>
                 <Sparkles className="mr-1 h-4 w-4" /> Ask Brain
               </Link>
