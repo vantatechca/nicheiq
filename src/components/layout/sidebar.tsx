@@ -67,8 +67,8 @@ export function Sidebar() {
         </nav>
       </ScrollArea>
       <div className="border-t border-slate-800 p-3 text-[11px] text-slate-500">
-        <div className="font-medium text-slate-400">Mock mode</div>
-        <div>USE_MOCK=true · Drizzle/Neon offline</div>
+        <div className="font-medium text-slate-400">Live mode</div>
+<div>Drizzle/Neon connected</div>
       </div>
     </aside>
   );
