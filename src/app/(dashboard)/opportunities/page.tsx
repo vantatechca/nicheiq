@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Filter, Plus, Sparkles, Sun } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Filter, Sparkles, Sun, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
+import { OpportunityCreateDialog } from "@/components/opportunity/create-dialog";
 import { mockOpportunities } from "@/mock/data";
 import {
   NICHE_LIST,
@@ -20,13 +23,43 @@ import {
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 
 export default function OpportunitiesPage() {
-  const [niche, setNiche] = useState<string | null>(null);
-  const [type, setType] = useState<string | null>(null);
-  const [effort, setEffort] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [minScore, setMinScore] = useState(0);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"score" | "newest" | "revenue">("score");
+  return (
+    <Suspense fallback={<div className="p-4 text-sm text-slate-500">Loading…</div>}>
+      <OpportunitiesView />
+    </Suspense>
+  );
+}
+
+function OpportunitiesView() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [niche, setNiche] = useState<string | null>(params.get("niche"));
+  const [type, setType] = useState<string | null>(params.get("type"));
+  const [effort, setEffort] = useState<string | null>(params.get("effort"));
+  const [status, setStatus] = useState<string | null>(params.get("status"));
+  const [minScore, setMinScore] = useState(Number(params.get("minScore") ?? 0));
+  const [search, setSearch] = useState(params.get("q") ?? "");
+  const [sort, setSort] = useState<"score" | "newest" | "revenue">(
+    (params.get("sort") as "score" | "newest" | "revenue") ?? "score",
+  );
+
+  // selection state for bulk actions
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Sync filters to URL (no scroll)
+  useEffect(() => {
+    const u = new URLSearchParams();
+    if (niche) u.set("niche", niche);
+    if (type) u.set("type", type);
+    if (effort) u.set("effort", effort);
+    if (status) u.set("status", status);
+    if (minScore > 0) u.set("minScore", String(minScore));
+    if (search.trim()) u.set("q", search.trim());
+    if (sort !== "score") u.set("sort", sort);
+    const qs = u.toString();
+    router.replace(qs ? `?${qs}` : "?", { scroll: false });
+  }, [niche, type, effort, status, minScore, search, sort, router]);
 
   const filtered = useMemo(() => {
     let rows = mockOpportunities.slice();
@@ -45,6 +78,39 @@ export default function OpportunitiesPage() {
     return rows;
   }, [niche, type, effort, status, minScore, search, sort]);
 
+  const allOnPage = filtered.map((o) => o.id);
+  const allSelected = selected.size > 0 && allOnPage.every((id) => selected.has(id));
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(allOnPage));
+  }
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearAllFilters() {
+    setNiche(null);
+    setType(null);
+    setEffort(null);
+    setStatus(null);
+    setMinScore(0);
+    setSearch("");
+    setSort("score");
+  }
+
+  async function bulkAction(label: string) {
+    if (selected.size === 0) return;
+    toast.success(`${label} ${selected.size} opportunit${selected.size === 1 ? "y" : "ies"} (mock)`);
+    setSelected(new Set());
+  }
+
+  const filterCount = [niche, type, effort, status].filter(Boolean).length + (minScore > 0 ? 1 : 0);
+
   return (
     <>
       <PageHeader
@@ -53,11 +119,11 @@ export default function OpportunitiesPage() {
         actions={
           <>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/brain"><Sparkles className="mr-1 h-4 w-4" /> Synthesize new</Link>
+              <Link href="/brain">
+                <Sparkles className="mr-1 h-4 w-4" /> Synthesize new
+              </Link>
             </Button>
-            <Button size="sm">
-              <Plus className="mr-1 h-4 w-4" /> Add manually
-            </Button>
+            <OpportunityCreateDialog />
           </>
         }
       />
@@ -92,6 +158,11 @@ export default function OpportunitiesPage() {
               />
               <span className="w-6 font-mono text-slate-300">{minScore}</span>
             </div>
+            {filterCount > 0 ? (
+              <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                <X className="mr-1 h-3 w-3" /> Clear {filterCount} filter{filterCount === 1 ? "" : "s"}
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-2">
             <FilterChips
@@ -122,45 +193,104 @@ export default function OpportunitiesPage() {
         </CardContent>
       </Card>
 
+      {selected.size > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <span className="font-medium text-primary">{selected.size} selected</span>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted")}>
+            Shortlist
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Marked building")}>
+            Mark building
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Abandoned")}>
+            Abandon
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Archived")}>
+            Archive
+          </Button>
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={toggleAll}
+          className="h-3 w-3 cursor-pointer"
+          aria-label="Select all"
+        />
+        Select all on page
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((o) => (
-          <Link key={o.id} href={`/opportunities/${o.id}`}>
-            <Card className="group h-full border-slate-800 bg-slate-900/40 transition-colors hover:border-primary/40 hover:bg-slate-900">
+        {filtered.map((o) => {
+          const isSelected = selected.has(o.id);
+          return (
+            <Card
+              key={o.id}
+              className={`group h-full border-slate-800 bg-slate-900/40 transition-colors hover:border-primary/40 hover:bg-slate-900 ${
+                isSelected ? "border-primary/60 ring-1 ring-primary/30" : ""
+              }`}
+            >
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    <ScoreBadge score={o.score} />
-                    <Badge variant="outline" className="text-[10px]">
-                      {o.opportunityType.replace(/_/g, " ")}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      <Sun className="mr-1 h-3 w-3" /> {o.buildEffort.replace(/_/g, " ")}
-                    </Badge>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px]"
-                  >
-                    {o.status}
-                  </Badge>
-                </div>
-                <h3 className="mt-2 line-clamp-2 text-sm font-medium leading-snug group-hover:text-primary">
-                  {o.title}
-                </h3>
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500">{o.summary}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                  <span className="font-semibold text-emerald-400">
-                    {formatUsd(o.projectedRevenueUsd, { compact: true })}
-                  </span>
-                  <span>{timeAgo(o.updatedAt)}</span>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggle(o.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-1 h-3 w-3 cursor-pointer"
+                    aria-label={`Select ${o.title}`}
+                  />
+                  <Link href={`/opportunities/${o.id}`} className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <ScoreBadge score={o.score} />
+                        <Badge variant="outline" className="text-[10px]">
+                          {o.opportunityType.replace(/_/g, " ")}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          <Sun className="mr-1 h-3 w-3" /> {o.buildEffort.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {o.status}
+                      </Badge>
+                    </div>
+                    <h3 className="mt-2 line-clamp-2 text-sm font-medium leading-snug group-hover:text-primary">
+                      {o.title}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{o.summary}</p>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-semibold text-emerald-400">
+                        {formatUsd(o.projectedRevenueUsd, { compact: true })}
+                      </span>
+                      <span>{timeAgo(o.updatedAt)}</span>
+                    </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
-          </Link>
-        ))}
+          );
+        })}
         {filtered.length === 0 ? (
-          <div className="col-span-full rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
-            No opportunities match your filters. Loosen the filters above.
+          <div className="col-span-full flex flex-col items-center gap-3 rounded-md border border-dashed border-slate-800 p-12 text-center">
+            <p className="text-sm text-slate-400">No opportunities match your filters.</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                Clear filters
+              </Button>
+              <OpportunityCreateDialog
+                trigger={
+                  <Button size="sm">
+                    Add manually
+                  </Button>
+                }
+              />
+            </div>
           </div>
         ) : null}
       </div>

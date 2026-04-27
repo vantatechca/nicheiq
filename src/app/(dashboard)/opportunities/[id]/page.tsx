@@ -11,12 +11,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { ScoreBar } from "@/components/shared/score-bar";
 import { PageHeader } from "@/components/shared/page-header";
+import { AnnotationsThread } from "@/components/opportunity/annotations";
 import {
   findOpportunity,
   mockOpportunities,
   mockSignals,
   mockProducts,
-  mockUsers,
 } from "@/mock/data";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 
@@ -221,16 +221,8 @@ export default function OpportunityDetailPage() {
             </TabsContent>
             <TabsContent value="annotations">
               <Card className="border-slate-800 bg-slate-900/40">
-                <CardContent className="space-y-2 p-3">
-                  <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-200">{mockUsers[0]!.name}</span>
-                      <span className="text-slate-500">{timeAgo(opp.updatedAt)}</span>
-                    </div>
-                    <div className="mt-1 text-slate-300">
-                      Want to validate via TikTok demo first. Add a 60-second screen recording link before committing.
-                    </div>
-                  </div>
+                <CardContent className="p-4">
+                  <AnnotationsThread opportunityId={opp.id} />
                 </CardContent>
               </Card>
             </TabsContent>

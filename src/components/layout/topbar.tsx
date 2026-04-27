@@ -1,11 +1,9 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import { Bell, LogOut, Search, Settings, Sparkles, User } from "lucide-react";
-import { ThemeToggle } from "./theme-toggle";
+import { Bell, LogOut, Settings, Sparkles, User } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -18,6 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { initials } from "@/lib/utils/format";
 import { MobileSidebar } from "./mobile-sidebar";
+import { ThemeToggle } from "./theme-toggle";
+import { CommandPalette } from "./command-palette";
 
 export function Topbar() {
   const { data } = useSession();
@@ -25,12 +25,8 @@ export function Topbar() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-800 bg-slate-950/80 px-4 backdrop-blur">
       <MobileSidebar />
-      <div className="relative hidden flex-1 max-w-xl md:block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <Input
-          placeholder="Search opportunities, products, niches…"
-          className="h-9 border-slate-800 bg-slate-900 pl-9 text-sm placeholder:text-slate-500"
-        />
+      <div className="flex-1">
+        <CommandPalette />
       </div>
       <div className="ml-auto flex items-center gap-2">
         <Badge variant="info" className="hidden md:inline-flex">
