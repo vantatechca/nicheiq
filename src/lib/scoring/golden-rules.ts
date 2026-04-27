@@ -1,5 +1,4 @@
 import type { GoldenRule } from "@/lib/types";
-import type { Opportunity } from "@/lib/types";
 
 export type RuleMatch = {
   rule: GoldenRule;
@@ -55,7 +54,7 @@ export function applyGoldenRules(o: OpportunityShape, rules: GoldenRule[]) {
         rule,
         matched,
         delta: change,
-        outcome: rule.ruleType,
+        outcome: rule.ruleType as "boost" | "penalize",
       });
     }
   }
