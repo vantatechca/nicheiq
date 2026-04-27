@@ -5,8 +5,10 @@ export default withAuth({
 });
 
 export const config = {
-  matcher: [
-    // Run on every request except auth, static assets, public files.
-    "/((?!login|api/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)",
-  ],
+  // Run on every request EXCEPT:
+  //   - /login
+  //   - /api/* (API routes manage their own auth → 401 instead of 307)
+  //   - Next.js static + image assets
+  //   - favicon and any file with an extension
+  matcher: ["/((?!login|api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };
