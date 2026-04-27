@@ -5,7 +5,7 @@ import { inngest } from "../client";
  * Phase I will plug in real crawler modules from src/lib/crawlers/<source>.ts.
  */
 export const crawlSource = inngest.createFunction(
-  { id: "crawl-source", retries: 3, concurrency: { limit: 8 } },
+  { id: "crawl-source", retries: 3, concurrency: { limit: 5 } },
   { event: "crawl/source.requested" },
   async ({ event, step }) => {
     const { sourceId } = event.data;
