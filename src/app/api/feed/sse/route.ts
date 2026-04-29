@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { mockSignals } from "@/mock/data";
 import { NICHE_LIST } from "@/lib/utils/constants";
 import type { Signal } from "@/lib/types";
+import { requireSession } from "@/lib/auth/session";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function pickRandom<T>(arr: readonly T[]): T {
@@ -32,7 +33,14 @@ function fakeSignal(): Signal {
   };
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // SSE auth via NextAuth cookie. EventSource can't send custom headers,
+  // but cookies are forwarded automatically — getServerSession reads them.
+  const session = await requireSession();
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -58,7 +66,7 @@ export async function GET(_req: NextRequest) {
           /* ignore */
         }
       };
-      _req.signal.addEventListener("abort", cleanup);
+      req.signal.addEventListener("abort", cleanup);
     },
   });
 

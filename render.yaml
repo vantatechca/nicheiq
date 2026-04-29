@@ -3,7 +3,14 @@ services:
   - type: web
     name: nicheiq
     runtime: node
-    plan: free
+    # `starter` ($7/mo) instead of `free` for two reasons:
+    #   1. Free spins down after 15min idle; cold start is ~30s on next request.
+    #      That breaks Inngest webhook delivery — events that fire while the
+    #      service is asleep are retried but cron jitter compounds.
+    #   2. Inngest's signing-key check runs on every webhook, so `/api/inngest`
+    #      can't tolerate the cold-start tax.
+    plan: starter
+    healthCheckPath: /api/health
     buildCommand: npm ci && npm run db:generate && npm run build
     startCommand: npm start
     envVars:

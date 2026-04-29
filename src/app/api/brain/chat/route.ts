@@ -2,8 +2,10 @@ import { NextRequest } from "next/server";
 import { brainMessageSchema } from "@/lib/utils/validation";
 import { assembleContext } from "@/lib/ai/context-assembler";
 import type { BrainMode } from "@/lib/ai/context-assembler";
+import { requireSession } from "@/lib/auth/session";
+import { getRateLimiter } from "@/lib/redis/client";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const cannedByMode: Record<BrainMode, string[]> = {
@@ -120,6 +122,38 @@ async function streamRealResponse(opts: {
 }
 
 export async function POST(req: NextRequest) {
+  // Auth gate — must be signed in to ask the Brain.
+  const session = await requireSession();
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+  const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
+
+  // Rate limit: 10 requests per minute per user. Returns null if Redis isn't
+  // configured (dev / mock mode), so we fall through and allow.
+  const limiter = getRateLimiter({ limit: 10, window: "1 m", key: "brain-chat" });
+  if (limiter) {
+    const { success, limit, remaining, reset } = await limiter.limit(userId);
+    if (!success) {
+      return new Response(
+        JSON.stringify({
+          error: "Rate limit exceeded",
+          message: "Slow down — Brain takes a breath. Try again in a few seconds.",
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": String(remaining),
+            "X-RateLimit-Reset": String(reset),
+            "Retry-After": String(Math.max(1, Math.ceil((reset - Date.now()) / 1000))),
+          },
+        },
+      );
+    }
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -141,7 +175,7 @@ export async function POST(req: NextRequest) {
         systemPrompt: assembleContext({
           mode: parsed.data.mode,
           refIds: parsed.data.contextRefs,
-          userId: "user_andrei",
+          userId,
         }),
         history: [],
         message: parsed.data.message,

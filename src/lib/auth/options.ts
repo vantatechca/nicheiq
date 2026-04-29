@@ -5,6 +5,20 @@ import { findUserByEmail } from "@/mock/data";
 
 const useMock = (process.env.USE_MOCK ?? "true") !== "false";
 
+// Production must have a real NEXTAUTH_SECRET. If missing, fail loud at startup
+// rather than silently signing JWTs with a known string.
+function resolveAuthSecret(): string {
+  const explicit = process.env.NEXTAUTH_SECRET;
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "NEXTAUTH_SECRET is not set. Production requires a real secret — generate one with `openssl rand -base64 32`.",
+    );
+  }
+  // Dev-only fallback. Does not apply in production.
+  return "dev-only-not-for-production-do-not-deploy";
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -47,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
   pages: { signIn: "/login" },
-  secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-do-not-use-in-prod",
+  secret: resolveAuthSecret(),
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
