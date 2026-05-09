@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Pencil, Plus, Sparkles, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -36,14 +36,41 @@ export default function BrainPage() {
 
 function BrainView() {
   const params = useSearchParams();
+  const router = useRouter();
   const queryMode = params.get("mode") ?? "global";
+  const queryId = params.get("id");
 
   const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
-  const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
-  const [mode, setMode] = useState(queryMode);
+
+  // When arriving with ?id=..., do NOT pre-select a mock conversation —
+  // the seeding effect below will create a fresh one. Pre-selecting causes
+  // ChatWindow to mount with stale messages that don't reset on activeId change.
+  const [activeId, setActiveId] = useState<string | null>(
+    queryId ? null : (mockConversations[0]?.id ?? null),
+  );
+  const [mode, setMode] = useState<string>(
+    queryId ? queryMode : (mockConversations[0]?.brainMode ?? "global"),
+  );
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Seed a fresh conversation whenever we arrive with a context ref.
+  // useEffect (not useState initializer) so it works even when Next.js
+  // reuses a cached BrainView instance between navigations.
+  const seededRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!queryId) return;
+    if (seededRef.current === queryId) return;
+    seededRef.current = queryId;
+
+    const fresh = seedConversation(queryMode, queryId);
+    setConversations((prev) => [fresh, ...prev]);
+    setActiveId(fresh.id);
+    setMode(queryMode);
+    router.replace("/brain");
+  }, [queryId, queryMode, router]);
 
   const active = conversations.find((c) => c.id === activeId);
   const initialMessages = active ? messagesFor(active.id) : [];
@@ -194,6 +221,7 @@ function BrainView() {
         </div>
         <div className="flex-1 overflow-hidden">
           <ChatWindow
+            key={active?.id ?? "empty"}
             initialMessages={initialMessages}
             mode={mode}
             conversationId={active?.id}
@@ -219,4 +247,33 @@ function BrainView() {
       </AlertDialog>
     </div>
   );
+}
+
+function seedConversation(mode: string, id: string): Conversation {
+  return {
+    id: `conv_local_${Date.now()}`,
+    userId: "user_andrei",
+    brainMode: mode,
+    contextRefs: contextRefsForMode(mode, id),
+    title: titleForMode(mode, id),
+    lastMessageAt: new Date().toISOString(),
+    messageCount: 0,
+  };
+}
+
+function contextRefsForMode(mode: string, id: string): Record<string, string> {
+  switch (mode) {
+    case "dataset_review": return { resellableAssetId: id };
+    case "opportunity":    return { opportunityId: id };
+    case "niche":          return { nicheId: id };
+    case "creator":        return { creatorId: id };
+    case "replicate":      return { sourceProductId: id };
+    case "build_plan":     return { opportunityId: id };
+    default:               return { id };
+  }
+}
+
+function titleForMode(mode: string, id: string): string {
+  const m = BRAIN_MODES.find((x) => x.value === mode);
+  return `${m?.label ?? "Review"} — ${id.slice(0, 12)}`;
 }
