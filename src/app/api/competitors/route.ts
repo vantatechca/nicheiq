@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-import { mockCompetitors } from "@/mock/data";
+import { desc } from "drizzle-orm";
+import { z } from "zod";
+import { getDb } from "@/lib/db/client";
+import { competitors } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
-import { z } from "zod";
 
 const competitorSchema = z.object({
   creatorId: z.string(),
@@ -13,12 +15,16 @@ const competitorSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  return ok({ competitors: mockCompetitors });
+
+  const db = getDb();
+  const rows = await db.select().from(competitors).orderBy(desc(competitors.lastReviewedAt));
+  return ok({ competitors: rows });
 }
 
 export async function POST(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
+
   let body: unknown;
   try {
     body = await req.json();
@@ -27,13 +33,24 @@ export async function POST(req: NextRequest) {
   }
   const parsed = competitorSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid body", parsed.error.flatten());
-  return created({
-    competitor: {
+
+  const db = getDb();
+  const [competitor] = await db
+    .insert(competitors)
+    .values({
       id: `comp_${Date.now()}`,
-      ...parsed.data,
+      creatorId: parsed.data.creatorId,
+      depth: parsed.data.depth,
       notes: parsed.data.notes ?? "",
-      playbook: { pricingTiers: [], postingCadence: "", topTags: [], funnels: [], signatureStyle: "" },
-      lastReviewedAt: new Date().toISOString(),
-    },
-  });
+      playbook: {
+        pricingTiers: [],
+        postingCadence: "",
+        topTags: [],
+        funnels: [],
+        signatureStyle: "",
+      },
+    })
+    .returning();
+
+  return created({ competitor });
 }

@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-import { mockSources } from "@/mock/data";
+import { asc } from "drizzle-orm";
+import { z } from "zod";
+import { getDb } from "@/lib/db/client";
+import { sources } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
-import { z } from "zod";
 
 const newSourceSchema = z.object({
   sourcePlatform: z.string().min(1),
@@ -14,12 +16,16 @@ const newSourceSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  return ok({ sources: mockSources });
+
+  const db = getDb();
+  const rows = await db.select().from(sources).orderBy(asc(sources.label));
+  return ok({ sources: rows });
 }
 
 export async function POST(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
+
   let body: unknown;
   try {
     body = await req.json();
@@ -28,18 +34,20 @@ export async function POST(req: NextRequest) {
   }
   const parsed = newSourceSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid body", parsed.error.flatten());
-  return created({
-    source: {
+
+  const db = getDb();
+  const [source] = await db
+    .insert(sources)
+    .values({
       id: `source_user_${Date.now()}`,
-      sourcePlatform: parsed.data.sourcePlatform,
+      sourcePlatform:
+        parsed.data.sourcePlatform as typeof sources.sourcePlatform.enumValues[number],
       label: parsed.data.label,
       config: parsed.data.config ?? {},
       enabled: true,
       cronSchedule: parsed.data.cronSchedule ?? "0 */6 * * *",
-      lastRunAt: null,
-      lastRunStatus: "idle",
-      lastError: null,
-      itemsTracked: 0,
-    },
-  });
+    })
+    .returning();
+
+  return created({ source });
 }
