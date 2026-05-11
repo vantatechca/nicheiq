@@ -1,7 +1,8 @@
 // Server Component for /creators. Smaller than products — only two filters
 // (search + platform). Sort is fixed to revenue desc (no sort UI).
-
-import { mockCreators } from "@/mock/data";
+import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { creators } from "@/lib/db/schema";
 import { CreatorsView } from "./creators-view";
 
 export const dynamic = "force-dynamic";
@@ -13,24 +14,40 @@ type SP = Promise<{
 
 export default async function CreatorsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-
   const search = sp.q ?? "";
   const platform = sp.platform ?? null;
 
-  let rows = [...mockCreators];
-  if (platform) rows = rows.filter((c) => c.sourcePlatform === platform);
-  if (search.trim()) {
-    const q = search.toLowerCase();
-    rows = rows.filter(
-      (c) => c.displayName.toLowerCase().includes(q) || c.handle.toLowerCase().includes(q),
+  const db = getDb();
+
+  const conditions: SQL[] = [];
+  if (platform)
+    conditions.push(
+      eq(creators.sourcePlatform, platform as typeof creators.sourcePlatform.enumValues[number]),
     );
+  if (search.trim()) {
+    const needle = `%${search.trim()}%`;
+    const textMatch = or(ilike(creators.displayName, needle), ilike(creators.handle, needle));
+    if (textMatch) conditions.push(textMatch);
   }
-  rows.sort((a, b) => b.totalEstRevenueUsd - a.totalEstRevenueUsd);
+
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(creators)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(creators.totalEstRevenueUsd), desc(creators.id))
+      .limit(200),
+    db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(creators),
+  ]);
+
+  const total = totalRow[0]?.count ?? 0;
 
   return (
     <CreatorsView
-      creators={rows}
-      total={mockCreators.length}
+      creators={rows as never[]}
+      total={total}
       filters={{ search, platform }}
     />
   );

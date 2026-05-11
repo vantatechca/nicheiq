@@ -9,13 +9,37 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { ScoreBar } from "@/components/shared/score-bar";
-import { findOpportunity } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 import { SCORE_DIMENSIONS } from "@/lib/utils/constants";
 
+interface ScoreDimension {
+  value: number;
+  weight: number;
+}
+
+interface ScoreBreakdown {
+  dimensions: Record<string, ScoreDimension>;
+}
+
+interface Opportunity {
+  id: string;
+  title: string;
+  summary: string;
+  niche: string;
+  opportunityType: string;
+  buildEffort: string;
+  status: string;
+  score: number;
+  projectedRevenueUsd: number;
+  scoreBreakdown: ScoreBreakdown;
+  createdBy: string;
+  createdAt: string;
+}
+
 export default function ComparePage() {
   return (
-    <Suspense fallback={<div className="p-4 text-sm text-slate-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-4 text-sm text-slate-500">Loading...</div>}>
       <CompareView />
     </Suspense>
   );
@@ -24,7 +48,32 @@ export default function ComparePage() {
 function CompareView() {
   const params = useSearchParams();
   const ids = (params.get("ids") ?? "").split(",").filter(Boolean).slice(0, 4);
-  const opps = ids.map((id) => findOpportunity(id)).filter(Boolean) as NonNullable<ReturnType<typeof findOpportunity>>[];
+
+  // Call useApi 4 times unconditionally with fixed slot indices. Pass null
+  // for unused slots so they skip the fetch. This satisfies the React Hooks
+  // rule of stable call order regardless of how many ids are in the URL.
+  const slot1 = useApi<{ opportunity: Opportunity }>(
+    ids[0] ? `/api/opportunities/${ids[0]}` : null,
+  );
+  const slot2 = useApi<{ opportunity: Opportunity }>(
+    ids[1] ? `/api/opportunities/${ids[1]}` : null,
+  );
+  const slot3 = useApi<{ opportunity: Opportunity }>(
+    ids[2] ? `/api/opportunities/${ids[2]}` : null,
+  );
+  const slot4 = useApi<{ opportunity: Opportunity }>(
+    ids[3] ? `/api/opportunities/${ids[3]}` : null,
+  );
+
+  const slots = [slot1, slot2, slot3, slot4];
+  const loading = slots.some((s, i) => ids[i] && s.loading);
+  const opps = slots
+    .map((s) => s.data?.opportunity)
+    .filter((o): o is Opportunity => !!o);
+
+  if (loading && opps.length === 0) {
+    return <div className="p-4 text-sm text-slate-500">Loading opportunities...</div>;
+  }
 
   if (opps.length === 0) {
     return (
@@ -35,23 +84,23 @@ function CompareView() {
           </Link>
         </Button>
         <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
-          Select 2–4 opportunities from the grid, then click Compare in the bulk-action bar.
+          Select 2 to 4 opportunities from the grid, then click Compare in the bulk-action bar.
         </div>
       </div>
     );
   }
 
-  // Find which dimension wins per opp
+  // Find which dimension wins per opp.
   const winners: Record<string, string> = {};
   for (const dim of SCORE_DIMENSIONS) {
     const dimKey = dim.key;
     const inverted = dimKey === "competition" || dimKey === "buildEffort";
     const best = opps.reduce((best, o) => {
-      const v = o.scoreBreakdown.dimensions[dimKey].value;
+      const v = o.scoreBreakdown.dimensions[dimKey]?.value ?? 0;
       const cmp = inverted ? -v : v;
       const bestV = inverted
-        ? -best.scoreBreakdown.dimensions[dimKey].value
-        : best.scoreBreakdown.dimensions[dimKey].value;
+        ? -(best.scoreBreakdown.dimensions[dimKey]?.value ?? 0)
+        : (best.scoreBreakdown.dimensions[dimKey]?.value ?? 0);
       return cmp > bestV ? o : best;
     }, opps[0]!);
     winners[dimKey] = best.id;
@@ -71,7 +120,7 @@ function CompareView() {
 
       <div
         className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${opps.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: "repeat(" + opps.length + ", minmax(0, 1fr))" }}
       >
         {opps.map((o) => (
           <Card key={o.id} className="border-slate-800 bg-slate-900/40">
@@ -99,10 +148,10 @@ function CompareView() {
                 <Cell label="Created by" value={o.createdBy} />
               </div>
               <div className="border-t border-slate-800 pt-3">
-                <ScoreBar breakdown={o.scoreBreakdown} />
+                <ScoreBar breakdown={o.scoreBreakdown as never} />
               </div>
               <Button asChild size="sm" variant="outline" className="w-full">
-                <Link href={`/opportunities/${o.id}`}>Open detail →</Link>
+                <Link href={"/opportunities/" + o.id}>Open detail</Link>
               </Button>
             </CardContent>
           </Card>
@@ -131,12 +180,21 @@ function CompareView() {
                   <tr key={dim.key} className="border-b border-slate-800/60">
                     <td className="py-2 text-xs text-slate-400">{dim.label}</td>
                     {opps.map((o) => {
-                      const v = o.scoreBreakdown.dimensions[dim.key].value;
+                      const v = o.scoreBreakdown.dimensions[dim.key]?.value ?? 0;
                       const won = winners[dim.key] === o.id;
                       return (
                         <td key={o.id} className="py-2">
-                          <span className={`flex items-center gap-1 ${won ? "text-emerald-400" : "text-slate-300"}`}>
-                            {won ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 opacity-30" />}
+                          <span
+                            className={
+                              "flex items-center gap-1 " +
+                              (won ? "text-emerald-400" : "text-slate-300")
+                            }
+                          >
+                            {won ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <Minus className="h-3 w-3 opacity-30" />
+                            )}
                             <span className="font-mono">{v}</span>
                           </span>
                         </td>
@@ -161,11 +219,21 @@ function CompareView() {
   );
 }
 
-function Cell({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Cell({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
     <div className="rounded-md border border-slate-800 bg-slate-950/40 p-2">
       <div className="text-[10px] uppercase text-slate-500">{label}</div>
-      <div className={`mt-0.5 text-sm ${highlight ? "font-semibold text-emerald-400" : "text-slate-200"}`}>
+      <div
+        className={"mt-0.5 text-sm " + (highlight ? "font-semibold text-emerald-400" : "text-slate-200")}
+      >
         {value}
       </div>
     </div>

@@ -6,21 +6,38 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
 import { RechartsLine } from "@/components/shared/recharts-line";
-import { mockTrends } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatNumber, formatPct } from "@/lib/utils/format";
 import { FilterChips } from "@/components/shared/filter-chips";
 import { NICHE_LIST } from "@/lib/utils/constants";
 
+interface Trend {
+  id: string;
+  keyword: string;
+  niche: string;
+  geo: string;
+  growthPct: number;
+  momentumScore: number;
+  volume7d: number;
+  volume30d: number;
+  series: { date: string; value: number }[];
+}
+
 export default function TrendsPage() {
   const [search, setSearch] = useState("");
   const [niche, setNiche] = useState<string | null>(null);
-  let rows = [...mockTrends];
-  if (niche) rows = rows.filter((t) => t.niche === niche);
+
+  // Server-side niche filter; client-side search.
+  const path = niche ? `/api/trends?niche=${niche}` : "/api/trends";
+  const { data, loading } = useApi<{ trends: Trend[] }>(path);
+
+  let rows = data?.trends ?? [];
   if (search.trim()) {
     const q = search.toLowerCase();
     rows = rows.filter((t) => t.keyword.toLowerCase().includes(q));
   }
-  rows.sort((a, b) => b.growthPct - a.growthPct);
+  // API already sorts by momentum_score desc; we want growth-first here.
+  rows = [...rows].sort((a, b) => b.growthPct - a.growthPct);
 
   return (
     <>
@@ -42,6 +59,16 @@ export default function TrendsPage() {
           />
         </CardContent>
       </Card>
+
+      {loading && rows.length === 0 ? (
+        <div className="text-xs text-slate-500">Loading trends…</div>
+      ) : null}
+
+      {!loading && rows.length === 0 ? (
+        <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+          No trends match. Loosen filters or wait for the next crawl.
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {rows.map((t) => (

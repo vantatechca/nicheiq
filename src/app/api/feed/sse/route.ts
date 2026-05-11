@@ -1,37 +1,24 @@
 import { NextRequest } from "next/server";
-import { mockSignals } from "@/mock/data";
-import { NICHE_LIST } from "@/lib/utils/constants";
-import type { Signal } from "@/lib/types";
+import { desc, gt } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { signals } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function pickRandom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)] as T;
-}
-
-function fakeSignal(): Signal {
-  const base = pickRandom(mockSignals);
-  const id = `sig_live_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
-  return {
-    ...base,
-    id,
-    score: Math.round(40 + Math.random() * 55),
-    snippet: pickRandom([
-      "Just hit 100 sales in 6 hours.",
-      "Trend volume +180% w/w in US.",
-      "Reddit thread crossing 800 upvotes — affiliate energy.",
-      "Product Hunt comments turning positive — top 5 of the day.",
-      "Kaggle dataset just dropped, 3M rows MIT-licensed.",
-      "PLR vendor pushing a 24-piece pack at $39.",
-      "Etsy shop expired with healthy review velocity — domain available.",
-    ]),
-    title: `${pickRandom(["Spike", "New launch", "Milestone", "Drop"])}: ${base.title}`,
-    niche: pickRandom(NICHE_LIST).value,
-    processedAt: new Date().toISOString(),
-  };
-}
+// SSE stream of new signals from the DB.
+//
+// Approach: polling, not pub/sub. Every POLL_INTERVAL_MS we query for any
+// signals with processed_at > lastSeen. New rows are pushed; watermark advances.
+//
+// When real-time pub/sub matters (high signal velocity, many subscribers),
+// swap this for an Upstash Redis pub/sub subscriber — the publishing side
+// (crawlers in Inngest) would PUBLISH to a channel on insert, and this route
+// would SUBSCRIBE. For current scale (low velocity, single user), polling is
+// the right tool.
+const POLL_INTERVAL_MS = 5_000;
+const HEARTBEAT_MS = 25_000;
 
 export async function GET(req: NextRequest) {
   // SSE auth via NextAuth cookie. EventSource can't send custom headers,
@@ -40,6 +27,18 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const db = getDb();
+
+  // Establish the watermark: the most recent processed_at in the DB. We only
+  // push signals processed AFTER this point — never replay history.
+  const [latest] = await db
+    .select({ processedAt: signals.processedAt })
+    .from(signals)
+    .orderBy(desc(signals.processedAt))
+    .limit(1);
+
+  let watermark: Date = latest?.processedAt ?? new Date(0);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -53,7 +52,7 @@ export async function GET(req: NextRequest) {
             encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`),
           );
         } catch {
-          /* controller is closed; ignore */
+          /* controller closed; ignore */
         }
       };
 
@@ -62,23 +61,49 @@ export async function GET(req: NextRequest) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
         } catch {
-          /* controller is closed; ignore */
+          /* closed */
         }
       };
 
-      send("hello", { ts: Date.now(), kind: "feed" });
+      send("hello", { ts: Date.now(), kind: "feed", watermark: watermark.toISOString() });
 
-      // Self-rescheduling tick so each interval is genuinely random.
-      // setInterval(..., 3000 + Math.random() * 3000) only evaluates the
-      // expression once, producing a fixed-cadence stream.
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
-      const tick = () => {
+      // Poll loop. Self-rescheduling via setTimeout so we never overlap
+      // queries if one is slow.
+      let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+      const poll = async () => {
         if (closed) return;
-        sendData(fakeSignal());
-        timeoutId = setTimeout(tick, 3000 + Math.random() * 3000);
-      };
-      timeoutId = setTimeout(tick, 3000 + Math.random() * 3000);
+        try {
+          const rows = await db
+            .select()
+            .from(signals)
+            .where(gt(signals.processedAt, watermark))
+            .orderBy(signals.processedAt)
+            .limit(50); // safety cap if a large batch arrives at once
 
+          for (const row of rows) {
+            sendData(row);
+            // Advance watermark as we go. If the same processed_at appears
+            // on multiple rows, the strictly-greater-than filter ensures we
+            // don't re-send the row, but it could miss siblings. For low
+            // velocity that's fine; for high-velocity ingest, switch to
+            // a tie-breaking cursor (processed_at, id).
+            if (row.processedAt > watermark) {
+              watermark = row.processedAt;
+            }
+          }
+        } catch (err) {
+          // Don't tear down the stream on transient errors. Just skip this
+          // poll and try again on the next tick.
+          console.error("[feed/sse] poll failed:", err);
+        }
+        if (!closed) {
+          pollTimeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      };
+      pollTimeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+
+      // Heartbeat to keep proxies (Render, Cloudflare) from closing idle
+      // connections. SSE comment lines (": ...") are ignored by clients.
       const heartbeat = setInterval(() => {
         if (closed) return;
         try {
@@ -86,11 +111,11 @@ export async function GET(req: NextRequest) {
         } catch {
           /* closed */
         }
-      }, 25_000);
+      }, HEARTBEAT_MS);
 
       const cleanup = () => {
         closed = true;
-        if (timeoutId) clearTimeout(timeoutId);
+        if (pollTimeoutId) clearTimeout(pollTimeoutId);
         clearInterval(heartbeat);
         try {
           controller.close();
@@ -98,6 +123,7 @@ export async function GET(req: NextRequest) {
           /* already closed */
         }
       };
+
       req.signal.addEventListener("abort", cleanup);
     },
   });

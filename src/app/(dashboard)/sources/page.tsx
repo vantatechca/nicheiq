@@ -10,28 +10,48 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
 import { SourceDetailDialog } from "@/components/sources/source-detail-dialog";
-import { mockSources } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
+import { api } from "@/lib/api-client/fetcher";
 import { timeAgo } from "@/lib/utils/format";
 import { SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import type { Source } from "@/lib/types";
 
 export default function SourcesPage() {
   const [search, setSearch] = useState("");
-  const [rows, setRows] = useState(mockSources);
   const [detail, setDetail] = useState<Source | null>(null);
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
 
-  const filtered = rows.filter((s) =>
-    s.label.toLowerCase().includes(search.toLowerCase()) ||
-    s.sourcePlatform.toLowerCase().includes(search.toLowerCase()),
+  const { data, refetch } = useApi<{ sources: Source[] }>("/api/sources");
+  const raw = data?.sources ?? [];
+  const rows = raw.map((s) => ({ ...s, enabled: optimistic[s.id] ?? s.enabled }));
+
+  const filtered = rows.filter(
+    (s) =>
+      s.label.toLowerCase().includes(search.toLowerCase()) ||
+      s.sourcePlatform.toLowerCase().includes(search.toLowerCase()),
   );
 
-  function toggle(id: string) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
-    toast.success("Source updated");
+  async function toggle(id: string, currentEnabled: boolean) {
+    const next = !currentEnabled;
+    setOptimistic((prev) => ({ ...prev, [id]: next }));
+    try {
+      await api.patch(`/api/sources/${id}`, { enabled: next });
+      toast.success(next ? "Source enabled" : "Source disabled");
+    } catch (err) {
+      setOptimistic((prev) => ({ ...prev, [id]: currentEnabled }));
+      toast.error((err as Error).message || "Toggle failed");
+    } finally {
+      refetch();
+    }
   }
 
-  function testCrawl(id: string) {
-    toast.info("Crawl queued (mock)…", { description: `Will inspect ${id} and report back.` });
+  async function testCrawl(id: string) {
+    toast.info("Crawl queued…", { description: `Inspecting ${id}. Results will appear in signals.` });
+    try {
+      await api.post(`/api/sources/${id}/test-crawl`);
+    } catch (err) {
+      toast.error((err as Error).message || "Crawl failed to queue");
+    }
   }
 
   return (
@@ -57,6 +77,12 @@ export default function SourcesPage() {
         </CardContent>
       </Card>
 
+      {rows.length === 0 ? (
+        <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+          No sources configured yet. Add one to start collecting signals.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((s) => {
           const platformMeta = SOURCE_PLATFORMS.find((p) => p.value === s.sourcePlatform);
@@ -71,11 +97,13 @@ export default function SourcesPage() {
                   <CardTitle className="flex items-center gap-2 text-base">
                     <span className="text-lg">{platformMeta?.icon}</span> {s.label}
                   </CardTitle>
-                  <CardDescription className="capitalize">{platformMeta?.category}</CardDescription>
+                  <CardDescription className="capitalize">
+                    {platformMeta?.category}
+                  </CardDescription>
                 </div>
                 <Switch
                   checked={s.enabled}
-                  onCheckedChange={() => toggle(s.id)}
+                  onCheckedChange={() => toggle(s.id, s.enabled)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </CardHeader>
@@ -98,11 +126,13 @@ export default function SourcesPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Cron</span>
-                  <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px]">{s.cronSchedule}</code>
+                  <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px]">
+                    {s.cronSchedule}
+                  </code>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Last run</span>
-                  <span>{timeAgo(s.lastRunAt)}</span>
+                  <span>{s.lastRunAt ? timeAgo(s.lastRunAt) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Items tracked</span>

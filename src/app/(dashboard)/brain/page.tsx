@@ -22,14 +22,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { ChatWindow } from "@/components/brain/chat-window";
 import { ModePicker } from "@/components/brain/mode-picker";
-import { mockConversations, messagesFor } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
+import { api } from "@/lib/api-client/fetcher";
 import { timeAgo } from "@/lib/utils/format";
 import { BRAIN_MODES } from "@/lib/utils/constants";
 import type { Conversation } from "@/lib/types";
 
+interface Message {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+}
+
 export default function BrainPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading Brain…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading Brain...</div>}>
       <BrainView />
     </Suspense>
   );
@@ -42,73 +51,112 @@ function BrainView() {
   const queryMode = params.get("mode") ?? "global";
   const queryId = params.get("id");
 
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  // Fetch conversation list from API.
+  const { data: convData, refetch: refetchConversations } =
+    useApi<{ conversations: Conversation[] }>("/api/brain/conversations");
+  const conversations = convData?.conversations ?? [];
 
-  // When arriving with ?id=..., do NOT pre-select a mock conversation —
-  // the seeding effect below will create a fresh one. Pre-selecting causes
-  // ChatWindow to mount with stale messages that don't reset on activeId change.
-  const [activeId, setActiveId] = useState<string | null>(
-    queryId ? null : (mockConversations[0]?.id ?? null),
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [mode, setMode] = useState<string>(queryMode);
+
+  // Once conversations load, pick the first one (if not arriving with ?id=).
+  useEffect(() => {
+    if (queryId) return; // seeding path will set it
+    if (activeId) return; // already chose
+    if (conversations.length === 0) return;
+    setActiveId(conversations[0]!.id);
+    setMode(conversations[0]!.brainMode);
+  }, [conversations, queryId, activeId]);
+
+  // Fetch messages for the active conversation.
+  const { data: msgData } = useApi<{ messages: Message[] }>(
+    activeId ? `/api/brain/conversations/${activeId}` : null,
   );
-  const [mode, setMode] = useState<string>(
-    queryId ? queryMode : (mockConversations[0]?.brainMode ?? "global"),
-  );
+  const initialMessages = msgData?.messages ?? [];
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Seed a fresh conversation whenever we arrive with a context ref.
-  // useEffect (not useState initializer) so it works even when Next.js
-  // reuses a cached BrainView instance between navigations.
+  // Seed a fresh conversation when arriving with ?id=. POSTs to the API so it
+  // persists across reloads.
   const seededRef = useRef<string | null>(null);
   useEffect(() => {
     if (!queryId) return;
     if (seededRef.current === queryId) return;
     seededRef.current = queryId;
 
-    const fresh = seedConversation(queryMode, queryId, session?.user?.id ?? "anonymous");
-    setConversations((prev) => [fresh, ...prev]);
-    setActiveId(fresh.id);
-    setMode(queryMode);
-    router.replace("/brain");
-  }, [queryId, queryMode, router, session?.user?.id]);
+    const contextRefs = contextRefsForMode(queryMode, queryId);
+    const title = titleForMode(queryMode, queryId);
+
+    (async () => {
+      try {
+        const res = await api.post<{ conversation: Conversation }>(
+          "/api/brain/conversations",
+          { brainMode: queryMode, contextRefs, title },
+        );
+        if (res?.conversation) {
+          setActiveId(res.conversation.id);
+          setMode(queryMode);
+          refetchConversations();
+        }
+      } catch (err) {
+        toast.error("Couldn't create conversation: " + (err as Error).message);
+      } finally {
+        router.replace("/brain");
+      }
+    })();
+  }, [queryId, queryMode, router, refetchConversations]);
 
   const active = conversations.find((c) => c.id === activeId);
-  const initialMessages = active ? messagesFor(active.id) : [];
 
   function startRename(c: Conversation) {
     setRenamingId(c.id);
     setRenameValue(c.title);
   }
-  function commitRename() {
+  async function commitRename() {
     if (!renamingId) return;
-    setConversations((prev) =>
-      prev.map((c) => (c.id === renamingId ? { ...c, title: renameValue.trim() || c.title } : c)),
-    );
-    setRenamingId(null);
-    toast.success("Renamed");
+    const newTitle = renameValue.trim();
+    if (!newTitle) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      await api.patch(`/api/brain/conversations/${renamingId}`, { title: newTitle });
+      toast.success("Renamed");
+      refetchConversations();
+    } catch (err) {
+      toast.error("Rename failed: " + (err as Error).message);
+    } finally {
+      setRenamingId(null);
+    }
   }
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deletingId) return;
-    setConversations((prev) => prev.filter((c) => c.id !== deletingId));
-    if (activeId === deletingId) setActiveId(null);
+    const id = deletingId;
     setDeletingId(null);
-    toast.success("Conversation deleted");
+    try {
+      await api.delete(`/api/brain/conversations/${id}`);
+      if (activeId === id) setActiveId(null);
+      toast.success("Conversation deleted");
+      refetchConversations();
+    } catch (err) {
+      toast.error("Delete failed: " + (err as Error).message);
+    }
   }
-  function newConversation() {
-    const id = `conv_local_${Date.now()}`;
-    const fresh: Conversation = {
-      id,
-      userId: session?.user?.id ?? "anonymous",
-      brainMode: mode,
-      contextRefs: {},
-      title: "Untitled conversation",
-      lastMessageAt: new Date().toISOString(),
-      messageCount: 0,
-    };
-    setConversations((prev) => [fresh, ...prev]);
-    setActiveId(id);
+  async function newConversation() {
+    try {
+      const res = await api.post<{ conversation: Conversation }>(
+        "/api/brain/conversations",
+        { brainMode: mode, contextRefs: {}, title: "Untitled conversation" },
+      );
+      if (res?.conversation) {
+        setActiveId(res.conversation.id);
+        refetchConversations();
+      }
+    } catch (err) {
+      toast.error("Couldn't create: " + (err as Error).message);
+    }
   }
 
   return (
@@ -228,7 +276,7 @@ function BrainView() {
             mode={mode}
             conversationId={active?.id}
             contextRefs={active?.contextRefs}
-            placeholder="Pressure-test an opportunity, draft a build plan, ask 'what should I build next?'"
+            placeholder="Pressure-test an opportunity, draft a build plan, ask what to build next."
           />
         </div>
       </Card>
@@ -251,31 +299,26 @@ function BrainView() {
   );
 }
 
-function seedConversation(mode: string, id: string, userId: string): Conversation {
-  return {
-    id: `conv_local_${Date.now()}`,
-    userId,
-    brainMode: mode,
-    contextRefs: contextRefsForMode(mode, id),
-    title: titleForMode(mode, id),
-    lastMessageAt: new Date().toISOString(),
-    messageCount: 0,
-  };
-}
-
 function contextRefsForMode(mode: string, id: string): Record<string, string> {
   switch (mode) {
-    case "dataset_review": return { resellableAssetId: id };
-    case "opportunity":    return { opportunityId: id };
-    case "niche":          return { nicheId: id };
-    case "creator":        return { creatorId: id };
-    case "replicate":      return { sourceProductId: id };
-    case "build_plan":     return { opportunityId: id };
-    default:               return { id };
+    case "dataset_review":
+      return { resellableAssetId: id };
+    case "opportunity":
+      return { opportunityId: id };
+    case "niche":
+      return { nicheId: id };
+    case "creator":
+      return { creatorId: id };
+    case "replicate":
+      return { sourceProductId: id };
+    case "build_plan":
+      return { opportunityId: id };
+    default:
+      return { id };
   }
 }
 
 function titleForMode(mode: string, id: string): string {
   const m = BRAIN_MODES.find((x) => x.value === mode);
-  return `${m?.label ?? "Review"} — ${id.slice(0, 12)}`;
+  return (m?.label ?? "Review") + " - " + id.slice(0, 12);
 }

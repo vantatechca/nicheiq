@@ -1,8 +1,9 @@
-// Server Component for /products. Filtering happens server-side; the view
-// component receives the filtered list as props. URL params drive data-shaping;
-// selection/dialog/hover state stays in the view client.
-
-import { mockProducts } from "@/mock/data";
+// Server Component for /products. Filtering happens server-side via Drizzle.
+// URL params drive data-shaping; selection/dialog/hover state stays in the
+// view client.
+import { and, desc, eq, ilike, lte, sql, type SQL } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { products } from "@/lib/db/schema";
 import { ProductsView } from "./products-view";
 
 export const dynamic = "force-dynamic";
@@ -16,27 +17,50 @@ type SP = Promise<{
 
 export default async function ProductsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-
   const niche = sp.niche ?? null;
   const platform = sp.platform ?? null;
   const search = sp.q ?? "";
   // Coerce safely — clamp in case the URL has garbage.
   const maxPrice = Math.max(5, Math.min(300, Number(sp.maxPrice) || 200));
 
-  let rows = mockProducts.slice();
-  if (niche) rows = rows.filter((p) => p.niche === niche);
-  if (platform) rows = rows.filter((p) => p.sourcePlatform === platform);
+  const db = getDb();
+
+  // Build WHERE conditions.
+  const conditions: SQL[] = [];
+  if (niche)
+    conditions.push(
+      eq(products.niche, niche as typeof products.niche.enumValues[number]),
+    );
+  if (platform)
+    conditions.push(
+      eq(products.sourcePlatform, platform as typeof products.sourcePlatform.enumValues[number]),
+    );
   if (search.trim()) {
-    const q = search.toLowerCase();
-    rows = rows.filter((p) => p.title.toLowerCase().includes(q));
+    conditions.push(ilike(products.title, `%${search.trim()}%`));
   }
-  rows = rows.filter((p) => (p.priceUsd ?? 0) <= maxPrice);
-  rows.sort((a, b) => (b.estMonthlyRevenueHigh ?? 0) - (a.estMonthlyRevenueHigh ?? 0));
+  // Price filter — note priceUsd is nullable; COALESCE to 0 so nulls don't get
+  // filtered out by accident (they were excluded above 0 by the old mock filter).
+  conditions.push(lte(sql`COALESCE(${products.priceUsd}, 0)`, maxPrice));
+
+  // Fetch filtered rows + total in parallel.
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(products)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(products.estMonthlyRevenueHigh), desc(products.id))
+      .limit(200),
+    db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(products),
+  ]);
+
+  const total = totalRow[0]?.count ?? 0;
 
   return (
     <ProductsView
-      products={rows}
-      total={mockProducts.length}
+      products={rows as never[]}
+      total={total}
       filters={{ niche, platform, search, maxPrice }}
     />
   );

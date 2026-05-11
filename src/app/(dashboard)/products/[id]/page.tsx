@@ -7,15 +7,65 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
-import { findProduct, mockProducts, mockCreators } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, formatNumber, formatRange, timeAgo } from "@/lib/utils/format";
+
+interface Product {
+  id: string;
+  title: string;
+  creator: string | null;
+  creatorId: string | null;
+  sourcePlatform: string;
+  sourceUrl: string;
+  thumbnailUrl: string | null;
+  niche: string;
+  tags: string[];
+  priceUsd: number | null;
+  ratingAvg: number | null;
+  ratingCount: number | null;
+  estMonthlySalesLow: number | null;
+  estMonthlySalesHigh: number | null;
+  estMonthlyRevenueLow: number | null;
+  estMonthlyRevenueHigh: number | null;
+  createdAt: string;
+}
+
+interface Creator {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  followerCount: number | null;
+  productCount: number;
+  totalEstRevenueUsd: number;
+  niches: string[];
+}
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const product = findProduct(id);
+
+  // Main product fetch.
+  const { data: productData, loading } = useApi<{ product: Product }>(
+    id ? `/api/products/${id}` : null,
+  );
+  const product = productData?.product ?? null;
+
+  // Creator lookup — only if product has a creatorId. Lookup by id.
+  const { data: creatorData } = useApi<{ creator: Creator }>(
+    product?.creatorId ? `/api/creators/${product.creatorId}` : null,
+  );
+  const creator = creatorData?.creator ?? null;
+
+  // Similar products — same niche.
+  const { data: similarData } = useApi<{ products: Product[] }>(
+    product ? `/api/products?niche=${product.niche}&limit=10` : null,
+  );
+  const similar = (similarData?.products ?? [])
+    .filter((p) => p.id !== product?.id)
+    .slice(0, 6);
+
+  if (loading) return <div className="p-6 text-sm text-slate-400">Loading product…</div>;
   if (!product) return <div className="p-6 text-sm text-slate-400">Product not found.</div>;
-  const creator = mockCreators.find((c) => c.id === product.creatorId);
-  const similar = mockProducts.filter((p) => p.id !== product.id && p.niche === product.niche).slice(0, 6);
 
   return (
     <>
@@ -46,7 +96,9 @@ export default function ProductDetailPage() {
         <div className="lg:col-span-2">
           <Card className="overflow-hidden border-slate-800 bg-slate-900/40">
             <div className="relative aspect-[16/9] bg-slate-800">
-              <img src={product.thumbnailUrl ?? ""} alt={product.title} className="h-full w-full object-cover" />
+              {product.thumbnailUrl ? (
+                <img src={product.thumbnailUrl} alt={product.title} className="h-full w-full object-cover" />
+              ) : null}
             </div>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
@@ -60,18 +112,26 @@ export default function ProductDetailPage() {
                 <Stat label="Price" value={formatUsd(product.priceUsd ?? 0)} />
                 <Stat
                   label="Rating"
-                  value={`${product.ratingAvg?.toFixed(1)} (${formatNumber(product.ratingCount, { compact: true })})`}
+                  value={
+                    product.ratingAvg != null
+                      ? `${product.ratingAvg.toFixed(1)} (${formatNumber(product.ratingCount ?? 0, { compact: true })})`
+                      : "—"
+                  }
                 />
                 <Stat label="Niche" value={product.niche.replace(/_/g, " ")} />
                 <Stat
                   label="Est. monthly sales"
-                  value={`${formatNumber(product.estMonthlySalesLow)}–${formatNumber(product.estMonthlySalesHigh)}`}
+                  value={
+                    product.estMonthlySalesLow != null && product.estMonthlySalesHigh != null
+                      ? `${formatNumber(product.estMonthlySalesLow)}–${formatNumber(product.estMonthlySalesHigh)}`
+                      : "—"
+                  }
                 />
                 <Stat
                   label="Est. monthly revenue"
-                  value={formatRange(product.estMonthlyRevenueLow, product.estMonthlyRevenueHigh)}
+                  value={formatRange(product.estMonthlyRevenueLow ?? 0, product.estMonthlyRevenueHigh ?? 0)}
                 />
-                <Stat label="First seen" value={timeAgo(product.firstSeenAt)} />
+                <Stat label="First seen" value={timeAgo(product.createdAt)} />
               </div>
             </CardContent>
           </Card>
@@ -82,14 +142,27 @@ export default function ProductDetailPage() {
               <CardDescription>Same niche, different creator.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
+              {similar.length === 0 && (
+                <div className="text-xs text-slate-500">No other products in this niche yet.</div>
+              )}
               {similar.map((s) => (
-                <Link key={s.id} href={`/products/${s.id}`} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900">
+                <Link
+                  key={s.id}
+                  href={`/products/${s.id}`}
+                  className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900"
+                >
                   <div className="flex items-center justify-between">
                     <div className="line-clamp-1 text-sm font-medium">{s.title}</div>
                     <span className="text-xs text-emerald-400">{formatUsd(s.priceUsd ?? 0)}</span>
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500">
-                    {s.creator} · <Star className="inline h-3 w-3 fill-amber-400 text-amber-400" /> {s.ratingAvg?.toFixed(1)}
+                    {s.creator}
+                    {s.ratingAvg != null ? (
+                      <>
+                        {" · "}
+                        <Star className="inline h-3 w-3 fill-amber-400 text-amber-400" /> {s.ratingAvg.toFixed(1)}
+                      </>
+                    ) : null}
                   </div>
                 </Link>
               ))}
@@ -106,14 +179,25 @@ export default function ProductDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3">
-                  <img src={creator.avatarUrl} alt={creator.displayName} className="h-12 w-12 rounded-full" />
+                  {creator.avatarUrl ? (
+                    <img
+                      src={creator.avatarUrl}
+                      alt={creator.displayName}
+                      className="h-12 w-12 rounded-full"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-full bg-slate-800" />
+                  )}
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{creator.displayName}</div>
                     <div className="truncate text-xs text-slate-500">{creator.handle}</div>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <Stat label="Followers" value={formatNumber(creator.followerCount, { compact: true })} />
+                  <Stat
+                    label="Followers"
+                    value={formatNumber(creator.followerCount ?? 0, { compact: true })}
+                  />
                   <Stat label="Products" value={String(creator.productCount)} />
                   <Stat
                     label="Est. revenue"

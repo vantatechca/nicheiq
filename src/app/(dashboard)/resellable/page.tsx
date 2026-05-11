@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
-import { mockResellable } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 import { RESELLABLE_STATUSES } from "@/lib/utils/constants";
 import type { ResellableAsset } from "@/lib/types";
@@ -45,7 +45,10 @@ type AssetTypeValue = (typeof ASSET_TYPES)[number]["value"];
 
 export default function ResellablePage() {
   const [tab, setTab] = useState("all");
-  const [assets, setAssets] = useState<ResellableAsset[]>(mockResellable);
+
+  // Initial list via the new useApi pattern. refetch lets us re-pull after create.
+  const { data, refetch } = useApi<{ assets: ResellableAsset[] }>("/api/resellable");
+  const assets = data?.assets ?? [];
 
   // New-asset dialog state
   const [open, setOpen] = useState(false);
@@ -80,7 +83,6 @@ export default function ResellablePage() {
       return;
     }
     try {
-      // Pre-validate to give a friendlier message than the zod URL error.
       new URL(sourceUrl);
     } catch {
       toast.error("Source URL must be a valid URL (e.g. https://...)");
@@ -106,12 +108,10 @@ export default function ResellablePage() {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? `HTTP ${res.status}`);
       }
-      const json = (await res.json()) as { data?: { asset: ResellableAsset } };
-      const created = json.data?.asset;
-      if (created) setAssets((prev) => [created, ...prev]);
       toast.success(`Tracking "${title.trim()}"`);
       resetForm();
       setOpen(false);
+      refetch(); // Pull the new asset back from the server.
     } catch (err) {
       toast.error(`Create failed: ${(err as Error).message}`);
     } finally {
@@ -141,6 +141,11 @@ export default function ResellablePage() {
           ))}
         </TabsList>
         <TabsContent value={tab} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.length === 0 && (
+            <div className="col-span-full rounded-md border border-dashed border-slate-800 p-6 text-center text-xs text-slate-500">
+              No assets in this status yet.
+            </div>
+          )}
           {filtered.map((a) => (
             <Card key={a.id} className="border-slate-800 bg-slate-900/40">
               <CardContent className="p-4">
@@ -153,12 +158,12 @@ export default function ResellablePage() {
                       a.status === "acquired"
                         ? "success"
                         : a.status === "negotiating"
-                        ? "warning"
-                        : a.status === "passed"
-                        ? "destructive"
-                        : a.status === "reviewing"
-                        ? "info"
-                        : "outline"
+                          ? "warning"
+                          : a.status === "passed"
+                            ? "destructive"
+                            : a.status === "reviewing"
+                              ? "info"
+                              : "outline"
                     }
                   >
                     {a.status}
@@ -167,7 +172,10 @@ export default function ResellablePage() {
                 <h3 className="mt-2 text-sm font-medium">{a.title}</h3>
                 <div className="mt-2 grid gap-1 text-xs">
                   <Row label="Asking" value={a.askingPriceUsd ? formatUsd(a.askingPriceUsd) : "—"} />
-                  <Row label="Monthly rev" value={a.monthlyRevenueUsd ? formatUsd(a.monthlyRevenueUsd) : "—"} />
+                  <Row
+                    label="Monthly rev"
+                    value={a.monthlyRevenueUsd ? formatUsd(a.monthlyRevenueUsd) : "—"}
+                  />
                   <Row label="License" value={a.license ?? "—"} />
                   <Row label="Niche" value={a.niche ? a.niche.replace(/_/g, " ") : "—"} />
                   <Row label="Source" value={a.sourcePlatform.replace(/_/g, " ")} />
@@ -197,13 +205,19 @@ export default function ResellablePage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); setOpen(o); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) resetForm();
+          setOpen(o);
+        }}
+      >
         <DialogContent className="border-slate-800 bg-slate-900 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Track a new asset</DialogTitle>
             <DialogDescription>
-              Datasets, PLR packs, expired listings, Flippa or MicroAcquire deals — anything you might
-              repackage and resell.
+              Datasets, PLR packs, expired listings, Flippa or MicroAcquire deals — anything you
+              might repackage and resell.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -286,7 +300,13 @@ export default function ResellablePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { resetForm(); setOpen(false); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                setOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={createAsset} disabled={creating}>

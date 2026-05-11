@@ -7,12 +7,33 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
-import { mockDigests } from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatDate, formatUsd, timeAgo } from "@/lib/utils/format";
 
+interface Digest {
+  id: string;
+  cadence: "daily" | "weekly";
+  periodStart: string;
+  periodEnd: string;
+  createdAt: string;
+  aiSummary: string;
+  topOpportunityIds: string[];
+  risingNiches: string[];
+  topProducts: { id: string; title: string; revenue: number }[];
+  sentTo: string[];
+}
+
 export default function DigestPage() {
-  const daily = mockDigests.filter((d) => d.cadence === "daily");
-  const weekly = mockDigests.filter((d) => d.cadence === "weekly");
+  const { data: dailyData, loading: dailyLoading } = useApi<{ digests: Digest[] }>(
+    "/api/digest?cadence=daily",
+  );
+  const { data: weeklyData, loading: weeklyLoading } = useApi<{ digests: Digest[] }>(
+    "/api/digest?cadence=weekly",
+  );
+
+  const daily = dailyData?.digests ?? [];
+  const weekly = weeklyData?.digests ?? [];
+
   return (
     <>
       <PageHeader
@@ -31,11 +52,19 @@ export default function DigestPage() {
           <TabsTrigger value="weekly">Weekly ({weekly.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="daily" className="grid gap-3 lg:grid-cols-2">
+          {dailyLoading && <div className="text-xs text-slate-500">Loading…</div>}
+          {!dailyLoading && daily.length === 0 && (
+            <div className="text-xs text-slate-500">No daily digests yet.</div>
+          )}
           {daily.map((d) => (
             <DigestCard key={d.id} digest={d} />
           ))}
         </TabsContent>
         <TabsContent value="weekly" className="grid gap-3 lg:grid-cols-2">
+          {weeklyLoading && <div className="text-xs text-slate-500">Loading…</div>}
+          {!weeklyLoading && weekly.length === 0 && (
+            <div className="text-xs text-slate-500">No weekly digests yet.</div>
+          )}
           {weekly.map((d) => (
             <DigestCard key={d.id} digest={d} />
           ))}
@@ -45,7 +74,7 @@ export default function DigestPage() {
   );
 }
 
-function DigestCard({ digest }: { digest: (typeof mockDigests)[number] }) {
+function DigestCard({ digest }: { digest: Digest }) {
   return (
     <Card className="border-slate-800 bg-slate-900/40">
       <CardHeader>
@@ -98,7 +127,8 @@ function DigestCard({ digest }: { digest: (typeof mockDigests)[number] }) {
         </div>
         <div className="flex items-center justify-between text-[11px] text-slate-500">
           <span>
-            <Mail className="mr-1 inline h-3 w-3" /> sent to {digest.sentTo.length} {digest.sentTo.length === 1 ? "recipient" : "recipients"}
+            <Mail className="mr-1 inline h-3 w-3" /> sent to {digest.sentTo.length}{" "}
+            {digest.sentTo.length === 1 ? "recipient" : "recipients"}
           </span>
           <Button variant="ghost" size="sm" className="h-6 text-xs">
             Resend

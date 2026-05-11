@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
-import { mockSignals } from "@/mock/data";
 import { NICHE_LIST } from "@/lib/utils/constants";
 import { timeAgo, formatNumber } from "@/lib/utils/format";
 import { useSse } from "@/lib/hooks/use-sse";
+import { useApi } from "@/lib/hooks/use-api";
 import { toast } from "sonner";
 import type { Signal } from "@/lib/types";
 
@@ -21,12 +21,17 @@ export default function FeedPage() {
   const [minScore, setMinScore] = useState(0);
   const [paused, setPaused] = useState(false);
 
+  // Live updates over SSE (real-time).
   const { items: liveItems, connected } = useSse<Signal>({
     url: "/api/feed/sse",
     enabled: !paused,
   });
 
-  const baseSignals: Signal[] = mockSignals;
+  // Initial backlog from REST (replaces mockSignals).
+  const { data: backlogData } = useApi<{ signals: Signal[] }>(`/api/signals?limit=100`);
+  const baseSignals: Signal[] = backlogData?.signals ?? [];
+
+  // Merge live + backlog and dedupe by id.
   const merged = [...liveItems, ...baseSignals];
   const seen = new Set<string>();
   const dedup = merged.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
@@ -132,9 +137,11 @@ export default function FeedPage() {
                 <div className="mt-1 line-clamp-1 text-sm font-medium">{s.title}</div>
                 <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{s.snippet}</div>
                 <div className="mt-1 text-[11px] text-slate-500">
-                  {s.engagement.upvotes ? `${formatNumber(s.engagement.upvotes, { compact: true })} upvotes · ` : ""}
-                  {s.engagement.comments ? `${s.engagement.comments} comments · ` : ""}
-                  {s.engagement.sales ? `${s.engagement.sales} sales` : ""}
+                  {s.engagement?.upvotes
+                    ? `${formatNumber(s.engagement.upvotes, { compact: true })} upvotes · `
+                    : ""}
+                  {s.engagement?.comments ? `${s.engagement.comments} comments · ` : ""}
+                  {s.engagement?.sales ? `${s.engagement.sales} sales` : ""}
                 </div>
               </div>
               <div className="flex gap-1">
