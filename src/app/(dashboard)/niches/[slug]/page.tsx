@@ -9,25 +9,76 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { Sparkline } from "@/components/shared/sparkline";
-import {
-  findNiche,
-  mockOpportunities,
-  mockProducts,
-  mockCreators,
-  mockTrends,
-  mockSignals,
-} from "@/mock/data";
+import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, formatNumber, formatPct, timeAgo } from "@/lib/utils/format";
+
+interface Niche {
+  id: string;
+  slug: string;
+  label: string;
+  description: string;
+}
+interface Opportunity {
+  id: string;
+  title: string;
+  niche: string;
+  opportunityType: string;
+  score: number;
+  projectedRevenueUsd: number;
+}
+interface Product {
+  id: string;
+  title: string;
+  creator: string | null;
+  priceUsd: number | null;
+}
+interface Creator {
+  id: string;
+  handle: string;
+  displayName: string;
+  niches: string[];
+}
+interface Trend {
+  id: string;
+  keyword: string;
+  momentumScore: number;
+  growthPct: number;
+  series: { date: string; value: number }[];
+}
+interface Signal {
+  id: string;
+  title: string;
+  signalType: string;
+  processedAt: string;
+  engagement: { upvotes?: number; comments?: number; sales?: number };
+}
+
+interface NicheDetailResponse {
+  niche: Niche;
+  opportunities: Opportunity[];
+  products: Product[];
+  creators: Creator[];
+  trends: Trend[];
+  signals: Signal[];
+}
 
 export default function NicheDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const n = findNiche(slug);
-  if (!n) return <div className="p-6 text-sm text-slate-400">Niche not found.</div>;
-  const opps = mockOpportunities.filter((o) => o.niche === n.slug).slice(0, 8);
-  const products = mockProducts.filter((p) => p.niche === n.slug).slice(0, 8);
-  const creators = mockCreators.filter((c) => c.niches.includes(n.slug));
-  const trends = mockTrends.filter((t) => t.niche === n.slug);
-  const signals = mockSignals.filter((s) => s.niche === n.slug).slice(0, 6);
+  const { data, loading } = useApi<NicheDetailResponse>(slug ? `/api/niches/${slug}` : null);
+
+  if (loading) return <div className="p-6 text-sm text-slate-400">Loading niche…</div>;
+  if (!data?.niche) return <div className="p-6 text-sm text-slate-400">Niche not found.</div>;
+
+  const { niche: n, opportunities, products, creators, trends, signals } = data;
+  const opps = opportunities.slice(0, 8);
+  const productsTop = products.slice(0, 8);
+  const signalsTop = signals.slice(0, 6);
+
+  // Momentum = avg of all trend momentum_score values for this niche, or 0 if none.
+  const momentum =
+    trends.length > 0
+      ? Math.round(trends.reduce((sum, t) => sum + t.momentumScore, 0) / trends.length)
+      : 0;
 
   return (
     <>
@@ -53,19 +104,19 @@ export default function NicheDetailPage() {
         <Card className="border-slate-800 bg-slate-900/40">
           <CardContent className="p-4">
             <div className="text-[10px] uppercase text-slate-500">Momentum</div>
-            <div className="mt-1 text-2xl font-semibold">{n.momentumScore}</div>
+            <div className="mt-1 text-2xl font-semibold">{momentum}</div>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-900/40">
           <CardContent className="p-4">
             <div className="text-[10px] uppercase text-slate-500">Products tracked</div>
-            <div className="mt-1 text-2xl font-semibold">{n.productCount}</div>
+            <div className="mt-1 text-2xl font-semibold">{products.length}</div>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-900/40">
           <CardContent className="p-4">
             <div className="text-[10px] uppercase text-slate-500">Opportunities</div>
-            <div className="mt-1 text-2xl font-semibold">{n.opportunityCount}</div>
+            <div className="mt-1 text-2xl font-semibold">{opportunities.length}</div>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-900/40">
@@ -83,6 +134,9 @@ export default function NicheDetailPage() {
             <CardDescription>Sorted by score.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
+            {opps.length === 0 && (
+              <div className="text-xs text-slate-500">No opportunities tracked in this niche yet.</div>
+            )}
             {opps.map((o) => (
               <Link
                 key={o.id}
@@ -109,6 +163,7 @@ export default function NicheDetailPage() {
             <CardTitle>Trends</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {trends.length === 0 && <div className="text-xs text-slate-500">No active trends.</div>}
             {trends.map((t) => (
               <div key={t.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
                 <div className="flex items-center justify-between text-sm">
@@ -135,7 +190,10 @@ export default function NicheDetailPage() {
             <CardTitle>Top products</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 md:grid-cols-2">
-            {products.map((p) => (
+            {productsTop.length === 0 && (
+              <div className="text-xs text-slate-500">No products in this niche yet.</div>
+            )}
+            {productsTop.map((p) => (
               <Link key={p.id} href={`/products/${p.id}`} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900">
                 <div className="line-clamp-1 text-sm font-medium">{p.title}</div>
                 <div className="text-xs text-slate-500">
@@ -151,7 +209,10 @@ export default function NicheDetailPage() {
             <CardTitle>Recent signals</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {signals.map((s) => (
+            {signalsTop.length === 0 && (
+              <div className="text-xs text-slate-500">No recent signals.</div>
+            )}
+            {signalsTop.map((s) => (
               <div key={s.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="text-[10px]">{s.signalType.replace(/_/g, " ")}</Badge>
@@ -159,7 +220,7 @@ export default function NicheDetailPage() {
                 </div>
                 <div className="mt-1 font-medium text-slate-200">{s.title}</div>
                 <div className="text-slate-500">
-                  {formatNumber(s.engagement.upvotes ?? 0, { compact: true })} signals
+                  {formatNumber(s.engagement?.upvotes ?? 0, { compact: true })} signals
                 </div>
               </div>
             ))}
