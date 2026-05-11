@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-import { mockConversations } from "@/mock/data";
+import { desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { getDb } from "@/lib/db/client";
+import { conversations } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
-import { z } from "zod";
 
 const newConvSchema = z.object({
   brainMode: z.enum([
@@ -21,12 +23,23 @@ const newConvSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  return ok({ conversations: mockConversations.filter((c) => c.userId === session.user.id) });
+  const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.userId, userId))
+    .orderBy(desc(conversations.lastMessageAt));
+
+  return ok({ conversations: rows });
 }
 
 export async function POST(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
+  const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
+
   let body: unknown;
   try {
     body = await req.json();
@@ -35,15 +48,18 @@ export async function POST(req: NextRequest) {
   }
   const parsed = newConvSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid body", parsed.error.flatten());
-  return created({
-    conversation: {
-      id: `conv_${Date.now()}`,
-      userId: session.user.id,
+
+  const db = getDb();
+  const [conversation] = await db
+    .insert(conversations)
+    .values({
+      id: `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      userId,
       brainMode: parsed.data.brainMode,
       contextRefs: parsed.data.contextRefs ?? {},
       title: parsed.data.title ?? "New conversation",
-      lastMessageAt: new Date().toISOString(),
-      messageCount: 0,
-    },
-  });
+    })
+    .returning();
+
+  return created({ conversation });
 }

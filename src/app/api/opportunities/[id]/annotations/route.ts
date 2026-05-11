@@ -1,14 +1,39 @@
 import { NextRequest } from "next/server";
+import { desc, eq } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { opportunities, annotations } from "@/lib/db/schema";
 import { ok, notFound, badRequest, created, unauthorized } from "@/lib/api/response";
 import { annotationSchema } from "@/lib/utils/validation";
-import { findOpportunity } from "@/mock/data";
 import { requireSession } from "@/lib/auth/session";
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
+  const db = getDb();
+
+  // Verify opportunity exists first — 404 with a clear message.
+  const [opp] = await db
+    .select({ id: opportunities.id })
+    .from(opportunities)
+    .where(eq(opportunities.id, params.id))
+    .limit(1);
+  if (!opp) return notFound("Opportunity not found");
+
+  const rows = await db
+    .select()
+    .from(annotations)
+    .where(eq(annotations.opportunityId, params.id))
+    .orderBy(desc(annotations.createdAt));
+
+  return ok({ annotations: rows });
+}
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  const opp = findOpportunity(params.id);
-  if (!opp) return notFound();
+  const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
+
   let body: unknown;
   try {
     body = await req.json();
@@ -17,21 +42,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const parsed = annotationSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid body", parsed.error.flatten());
-  return created({
-    annotation: {
-      id: `ann_${Date.now()}`,
-      opportunityId: opp.id,
-      userId: session.user.id,
-      body: parsed.data.body,
-      createdAt: new Date().toISOString(),
-    },
-  });
-}
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await requireSession();
-  if (!session) return unauthorized();
-  const opp = findOpportunity(params.id);
-  if (!opp) return notFound();
-  return ok({ annotations: [] });
+  const db = getDb();
+
+  const [opp] = await db
+    .select({ id: opportunities.id })
+    .from(opportunities)
+    .where(eq(opportunities.id, params.id))
+    .limit(1);
+  if (!opp) return notFound("Opportunity not found");
+
+  const [annotation] = await db
+    .insert(annotations)
+    .values({
+      id: `ann_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      opportunityId: params.id,
+      userId,
+      body: parsed.data.body,
+    })
+    .returning();
+
+  return created({ annotation });
 }
