@@ -5,6 +5,18 @@ import { findUserByEmail } from "@/mock/data";
 
 const useMock = (process.env.USE_MOCK ?? "true") !== "false";
 
+// Mock auth uses plaintext credentials baked into the repo and published in
+// README.md. It must never serve real auth requests in production. Guard
+// inside authorize() (below) rather than module-load, so `next build`
+// (which sets NODE_ENV=production) doesn't trip on legitimate build pipelines.
+function assertMockAllowed() {
+  if (useMock && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "USE_MOCK=true is forbidden in production. Mock users have publicly-documented plaintext passwords.",
+    );
+  }
+}
+
 // Production must have a real NEXTAUTH_SECRET. If missing, fail loud at startup
 // rather than silently signing JWTs with a known string.
 function resolveAuthSecret(): string {
@@ -28,6 +40,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        assertMockAllowed();
         const email = credentials?.email?.toLowerCase().trim();
         const password = credentials?.password;
         if (!email || !password) return null;

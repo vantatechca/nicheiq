@@ -21,7 +21,7 @@ const newConvSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  return ok({ conversations: mockConversations.filter((c) => c.userId === session.user.id || c.userId === "user_andrei") });
+  return ok({ conversations: mockConversations.filter((c) => c.userId === session.user.id) });
 }
 
 export async function POST(req: NextRequest) {

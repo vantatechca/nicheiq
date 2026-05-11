@@ -44,26 +44,58 @@ export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
+      let closed = false;
+
       const send = (event: string, payload: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`),
+          );
+        } catch {
+          /* controller is closed; ignore */
+        }
       };
+
+      const sendData = (payload: unknown) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+        } catch {
+          /* controller is closed; ignore */
+        }
+      };
+
       send("hello", { ts: Date.now(), kind: "feed" });
-      // Default `message` events are what useSse listens to.
-      const interval = setInterval(() => {
-        const sig = fakeSignal();
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(sig)}\n\n`));
-      }, 3000 + Math.random() * 3000);
-      // Heartbeat to keep connection alive
+
+      // Self-rescheduling tick so each interval is genuinely random.
+      // setInterval(..., 3000 + Math.random() * 3000) only evaluates the
+      // expression once, producing a fixed-cadence stream.
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const tick = () => {
+        if (closed) return;
+        sendData(fakeSignal());
+        timeoutId = setTimeout(tick, 3000 + Math.random() * 3000);
+      };
+      timeoutId = setTimeout(tick, 3000 + Math.random() * 3000);
+
       const heartbeat = setInterval(() => {
-        controller.enqueue(encoder.encode(`: hb\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`: hb\n\n`));
+        } catch {
+          /* closed */
+        }
       }, 25_000);
+
       const cleanup = () => {
-        clearInterval(interval);
+        closed = true;
+        if (timeoutId) clearTimeout(timeoutId);
         clearInterval(heartbeat);
         try {
           controller.close();
         } catch {
-          /* ignore */
+          /* already closed */
         }
       };
       req.signal.addEventListener("abort", cleanup);

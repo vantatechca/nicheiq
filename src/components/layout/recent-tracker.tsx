@@ -50,25 +50,25 @@ export function RecentTracker() {
   const pathname = usePathname();
   useEffect(() => {
     if (!pathname) return;
-    const opp = pathname.match(/^\/opportunities\/(opp[a-z0-9_]+|opportunity_[a-z0-9_]+)\/?$/);
+    const opp = pathname.match(/^\/opportunities\/([\w-]+)\/?$/);
     if (opp) {
       const o = findOpportunity(opp[1] ?? "");
       if (o) pushRecent({ href: pathname, label: o.title, kind: "opportunity", visitedAt: new Date().toISOString() });
       return;
     }
-    const prod = pathname.match(/^\/products\/(product_[a-z0-9_]+)\/?$/);
+    const prod = pathname.match(/^\/products\/([\w-]+)\/?$/);
     if (prod) {
       const p = findProduct(prod[1] ?? "");
       if (p) pushRecent({ href: pathname, label: p.title, kind: "product", visitedAt: new Date().toISOString() });
       return;
     }
-    const crt = pathname.match(/^\/creators\/(creator_[a-z0-9_]+)\/?$/);
+    const crt = pathname.match(/^\/creators\/([\w-]+)\/?$/);
     if (crt) {
       const c = findCreator(crt[1] ?? "");
       if (c) pushRecent({ href: pathname, label: c.displayName, kind: "creator", visitedAt: new Date().toISOString() });
       return;
     }
-    const nch = pathname.match(/^\/niches\/([a-z_]+)\/?$/);
+    const nch = pathname.match(/^\/niches\/([\w-]+)\/?$/);
     if (nch) {
       const n = findNiche(nch[1] ?? "");
       if (n) pushRecent({ href: pathname, label: n.label, kind: "niche", visitedAt: new Date().toISOString() });

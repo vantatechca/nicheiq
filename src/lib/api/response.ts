@@ -30,9 +30,18 @@ export async function parseJson<T extends z.ZodTypeAny>(request: Request, schema
   return schema.parse(raw);
 }
 
-export function paginate<T>(items: T[], cursor?: string, limit = 25) {
+/**
+ * Offset-based pagination over an in-memory array. The `cursor` is just an
+ * integer offset string ("25", "50", …). When switching to DB-backed queries,
+ * use keyset/cursor pagination instead — do NOT pass DB query results through
+ * this function.
+ */
+export function offsetPaginate<T>(items: T[], cursor?: string, limit = 25) {
   const start = cursor ? Math.max(0, parseInt(cursor, 10) || 0) : 0;
   const slice = items.slice(start, start + limit);
   const next = start + slice.length < items.length ? String(start + slice.length) : null;
   return { items: slice, nextCursor: next, total: items.length };
 }
+
+/** @deprecated Use offsetPaginate. Kept for back-compat with existing callers. */
+export const paginate = offsetPaginate;

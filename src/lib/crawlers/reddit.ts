@@ -12,6 +12,8 @@ const DEFAULT_SUBS = [
   "InternetIsBeautiful",
 ];
 
+const USER_AGENT = "nicheiq-bot/0.1 (research; contact andrei@nicheiq.com)";
+
 interface RedditPost {
   data: {
     id: string;
@@ -26,16 +28,58 @@ interface RedditPost {
   };
 }
 
+// Cached OAuth token. Reddit client-credentials tokens last ~1 hour.
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function getRedditToken(): Promise<string | null> {
+  const id = process.env.REDDIT_CLIENT_ID;
+  const secret = process.env.REDDIT_CLIENT_SECRET;
+  if (!id || !secret) return null;
+
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
+    return cachedToken.value;
+  }
+
+  const auth = Buffer.from(`${id}:${secret}`).toString("base64");
+  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${auth}`,
+      "content-type": "application/x-www-form-urlencoded",
+      "user-agent": USER_AGENT,
+    },
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { access_token?: string; expires_in?: number };
+  if (!json.access_token) return null;
+  cachedToken = {
+    value: json.access_token,
+    expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
+  };
+  return cachedToken.value;
+}
+
 const reddit: CrawlerModule = {
   source: "reddit",
   requiresHeadless: false,
   async crawl({ config }) {
     const subs = (config.subs as string[] | undefined) ?? DEFAULT_SUBS;
     const limit = (config.limit as number | undefined) ?? 25;
+
+    // Prefer OAuth (100 req/min/account). Fall back to public JSON (~10 req/min/IP)
+    // only when credentials aren't configured — public JSON is heavily rate-limited.
+    const token = await getRedditToken();
+    const baseHost = token ? "https://oauth.reddit.com" : "https://www.reddit.com";
+    const headers: Record<string, string> = { "user-agent": USER_AGENT };
+    if (token) headers.authorization = `Bearer ${token}`;
+
     const results = await Promise.all(
       subs.map(async (sub) => {
-        const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=${limit}`, {
-          headers: { "user-agent": "nicheiq-bot/0.1 (research; contact andrei@nicheiq.com)" },
+        const res = await fetch(`${baseHost}/r/${sub}/hot.json?limit=${limit}`, {
+          headers,
+          signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) return { sub, posts: [] };
         const json = (await res.json()) as { data: { children: RedditPost[] } };

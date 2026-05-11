@@ -23,7 +23,14 @@ export function ChatWindow({ initialMessages, mode, conversationId, contextRefs,
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // ScrollArea (Radix) renders its own scrolling viewport. The inner content
+    // div doesn't scroll itself — we have to find the viewport ancestor.
+    const viewport =
+      (scrollRef.current?.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null) ??
+      (scrollRef.current?.parentElement?.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      ) as HTMLElement | null);
+    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   function submit() {
@@ -53,7 +60,10 @@ export function ChatWindow({ initialMessages, mode, conversationId, contextRefs,
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submit();
+              }
             }}
             placeholder={placeholder ?? "Ask anything…  (⌘+Enter to send)"}
             rows={2}

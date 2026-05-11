@@ -506,7 +506,7 @@ const signalSeed: Signal[] = [];
 for (let i = 0; i < 60; i++) {
   const niche = nicheValues[i % nicheValues.length] as NicheValue;
   const platform = pick(platformList.concat(["reddit", "product_hunt", "indie_hackers", "google_trends"] as SourcePlatform[]), i + 91);
-  const signalType = signalTypes[i % signalTypes.length];
+  const signalType = signalTypes[i % signalTypes.length]!;
   signalSeed.push({
     id: `signal_${i + 1}`,
     signalType,

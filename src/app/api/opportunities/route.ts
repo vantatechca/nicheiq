@@ -27,9 +27,7 @@ export async function GET(req: NextRequest) {
   else if (q.sort === "revenue") rows.sort((a, b) => b.projectedRevenueUsd - a.projectedRevenueUsd);
   else rows.sort((a, b) => b.score - a.score);
 
-  const cursor = req.nextUrl.searchParams.get("cursor") ?? undefined;
-  const limit = Math.min(100, Number(req.nextUrl.searchParams.get("limit") ?? 25));
-  const page = paginate(rows, cursor, limit);
+  const page = paginate(rows, q.cursor, q.limit);
   return ok({ opportunities: page.items }, { nextCursor: page.nextCursor, total: page.total });
 }
 

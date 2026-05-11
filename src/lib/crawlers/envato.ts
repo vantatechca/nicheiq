@@ -33,7 +33,10 @@ const envato: CrawlerModule = {
     const site = (config.site as string | undefined) ?? "themeforest.net";
     const sortBy = (config.sortBy as string | undefined) ?? "trending";
     const url = `https://api.envato.com/v1/discovery/search/search/item?site=${site}&sort_by=${sortBy}&term=${encodeURIComponent(term)}&page_size=30`;
-    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) throw new Error(`Envato fetch failed: ${res.status}`);
     return (await res.json()) as EnvatoResponse;
   },

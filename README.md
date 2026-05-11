@@ -26,7 +26,7 @@ The dashboard, opportunities, products, creators, niches, trends, sources, rules
 | Auth | NextAuth v4 (Credentials + JWT, max 4 seats) |
 | Cache + RL | Upstash Redis · @upstash/ratelimit |
 | Jobs | Inngest (durable cron + event functions) |
-| Real-time | SSE on Edge Runtime |
+| Real-time | SSE on Node runtime |
 | AI tiers | Tier 1 OpenRouter (Qwen) · Tier 2 Claude Haiku · Tier 3 Claude Sonnet |
 | Email | Resend (optional) |
 | Tests | Vitest (unit) · Playwright (one happy-path E2E) |

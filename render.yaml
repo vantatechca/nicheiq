@@ -44,10 +44,12 @@ services:
         value: ""
       - key: UPSTASH_REDIS_REST_TOKEN
         value: ""
+      # Inngest — set as secrets in Render dashboard. Empty/missing values
+      # cause /api/inngest to accept unsigned webhooks (CVE-class risk).
       - key: INNGEST_EVENT_KEY
-        value: ""
+        sync: false
       - key: INNGEST_SIGNING_KEY
-        value: ""
+        sync: false
 
       # Node version
       - key: NODE_VERSION

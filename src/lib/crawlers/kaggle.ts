@@ -28,7 +28,10 @@ const kaggle: CrawlerModule = {
     const search = (config.search as string | undefined) ?? "";
     const url = `https://www.kaggle.com/api/v1/datasets/list?sortBy=${sortBy}&search=${encodeURIComponent(search)}`;
     const auth = "Basic " + Buffer.from(`${username}:${key}`).toString("base64");
-    const res = await fetch(url, { headers: { authorization: auth } });
+    const res = await fetch(url, {
+      headers: { authorization: auth },
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) throw new Error(`Kaggle fetch failed: ${res.status}`);
     return (await res.json()) as KaggleDataset[];
   },

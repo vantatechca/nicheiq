@@ -19,13 +19,13 @@ export function useBrainChat(initial: Message[] = []) {
     async (args: SendArgs) => {
       setPending(true);
       const userMsg: Message = {
-        id: `local_${Date.now()}`,
+        id: `local_${crypto.randomUUID()}`,
         conversationId: args.conversationId ?? "local",
         role: "user",
         content: args.message,
         createdAt: new Date().toISOString(),
       };
-      const assistantId = `local_${Date.now() + 1}`;
+      const assistantId = `local_${crypto.randomUUID()}`;
       const assistantMsg: Message = {
         id: assistantId,
         conversationId: args.conversationId ?? "local",

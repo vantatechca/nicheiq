@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { findOpportunity } from "@/mock/data";
+import { findOpportunity, mockOpportunities } from "@/mock/data";
 import { ok, notFound, badRequest, unauthorized } from "@/lib/api/response";
 import { opportunityUpdateSchema } from "@/lib/utils/validation";
 import { requireSession } from "@/lib/auth/session";
@@ -32,7 +32,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  const opp = findOpportunity(params.id);
-  if (!opp) return notFound("Opportunity not found");
-  return ok({ deleted: opp.id });
+  const idx = mockOpportunities.findIndex((o) => o.id === params.id);
+  if (idx < 0) return notFound("Opportunity not found");
+  const [deleted] = mockOpportunities.splice(idx, 1);
+  return ok({ deleted: deleted!.id });
 }

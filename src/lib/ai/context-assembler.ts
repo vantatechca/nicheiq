@@ -64,7 +64,7 @@ function patternsBlock() {
 
 function recentDecisions(userId: string) {
   return mockActivity
-    .filter((a) => a.userId === userId || a.userId === "user_andrei")
+    .filter((a) => a.userId === userId)
     .slice(0, MAX_DECISIONS)
     .map((a) => `- ${a.action} ${a.entityType} (${a.entityId})`)
     .join("\n");

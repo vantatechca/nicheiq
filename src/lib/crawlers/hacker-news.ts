@@ -18,17 +18,31 @@ const hackerNews: CrawlerModule = {
   async crawl({ config }) {
     const which = (config.list as string | undefined) ?? "showstories";
     const limit = (config.limit as number | undefined) ?? 30;
-    const idsRes = await fetch(`https://hacker-news.firebaseio.com/v0/${which}.json`);
+    const idsRes = await fetch(`https://hacker-news.firebaseio.com/v0/${which}.json`, {
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!idsRes.ok) throw new Error(`HN ${which} fetch failed: ${idsRes.status}`);
     const ids = (await idsRes.json()) as number[];
     const slice = ids.slice(0, limit);
-    const items = await Promise.all(
-      slice.map(async (id) => {
-        const r = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
-        return r.ok ? ((await r.json()) as HnItem) : null;
-      }),
-    );
-    return items.filter(Boolean) as HnItem[];
+
+    // Concurrency-capped settled fetches. Previously fired all 30 in parallel
+    // with Promise.all — one rejection nuked the whole crawl, and the burst
+    // scales linearly with limit.
+    const concurrency = 5;
+    const results: (HnItem | null)[] = [];
+    for (let i = 0; i < slice.length; i += concurrency) {
+      const chunk = slice.slice(i, i + concurrency);
+      const settled = await Promise.allSettled(
+        chunk.map(async (id) => {
+          const r = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {
+            signal: AbortSignal.timeout(8_000),
+          });
+          return r.ok ? ((await r.json()) as HnItem) : null;
+        }),
+      );
+      results.push(...settled.map((s) => (s.status === "fulfilled" ? s.value : null)));
+    }
+    return results.filter(Boolean) as HnItem[];
   },
   parse(raw: unknown) {
     return raw as HnItem[];

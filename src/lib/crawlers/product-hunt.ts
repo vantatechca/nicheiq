@@ -42,9 +42,17 @@ const productHunt: CrawlerModule = {
         authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ query, variables: { first: limit } }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Product Hunt fetch failed: ${res.status}`);
-    return (await res.json()) as PhResponse;
+    const json = (await res.json()) as PhResponse & { errors?: { message: string }[] };
+    // GraphQL APIs return 200 OK with { errors: [...] } on rate limits, invalid
+    // queries, or expired tokens. Surface the real error instead of letting
+    // the parse step crash with "Cannot read properties of undefined".
+    if (json.errors?.length) {
+      throw new Error(`Product Hunt GraphQL error: ${json.errors[0]!.message}`);
+    }
+    return json;
   },
   parse(raw: unknown) {
     const r = raw as PhResponse;

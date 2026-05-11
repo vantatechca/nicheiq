@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import { Bell, LogOut, Settings, Sparkles, User } from "lucide-react";
+import { LogOut, Settings, Sparkles, User } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,9 +33,13 @@ export function Topbar() {
           <Sparkles className="mr-1 h-3 w-3" /> Brain online
         </Badge>
         <ThemeToggle />
+        {/* TODO: wire notifications panel sourced from /api/activity.
+            Removed until the panel exists — a non-functional bell is worse
+            than no bell because it implies a feature that doesn't work.
         <Button variant="ghost" size="icon" aria-label="Notifications">
           <Bell className="h-4 w-4" />
         </Button>
+        */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-9 gap-2 px-2">

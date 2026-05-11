@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Pencil, Plus, Sparkles, Trash } from "lucide-react";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ export default function BrainPage() {
 
 function BrainView() {
   const params = useSearchParams();
+  const { data: session } = useSession();
   const router = useRouter();
   const queryMode = params.get("mode") ?? "global";
   const queryId = params.get("id");
@@ -65,12 +67,12 @@ function BrainView() {
     if (seededRef.current === queryId) return;
     seededRef.current = queryId;
 
-    const fresh = seedConversation(queryMode, queryId);
+    const fresh = seedConversation(queryMode, queryId, session?.user?.id ?? "anonymous");
     setConversations((prev) => [fresh, ...prev]);
     setActiveId(fresh.id);
     setMode(queryMode);
     router.replace("/brain");
-  }, [queryId, queryMode, router]);
+  }, [queryId, queryMode, router, session?.user?.id]);
 
   const active = conversations.find((c) => c.id === activeId);
   const initialMessages = active ? messagesFor(active.id) : [];
@@ -98,7 +100,7 @@ function BrainView() {
     const id = `conv_local_${Date.now()}`;
     const fresh: Conversation = {
       id,
-      userId: "user_andrei",
+      userId: session?.user?.id ?? "anonymous",
       brainMode: mode,
       contextRefs: {},
       title: "Untitled conversation",
@@ -249,10 +251,10 @@ function BrainView() {
   );
 }
 
-function seedConversation(mode: string, id: string): Conversation {
+function seedConversation(mode: string, id: string, userId: string): Conversation {
   return {
     id: `conv_local_${Date.now()}`,
-    userId: "user_andrei",
+    userId,
     brainMode: mode,
     contextRefs: contextRefsForMode(mode, id),
     title: titleForMode(mode, id),

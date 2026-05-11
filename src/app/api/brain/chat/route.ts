@@ -87,11 +87,24 @@ async function streamRealResponse(opts: {
   systemPrompt: string;
   history: { role: "user" | "assistant"; content: string }[];
   message: string;
+  signal?: AbortSignal;
 }): Promise<ReadableStream<Uint8Array>> {
-  const { selectModel, checkSpendCap, recordSpend } = await import("@/lib/ai/client");
-  const cap = await checkSpendCap();
+  const { reserveSpend, recordActualSpend } = await import("@/lib/ai/client");
+  const Anthropic = (await import("@anthropic-ai/sdk")).default;
+
+  // Tier-3 (Sonnet 4.6) pricing per million tokens. Keep in sync with the
+  // PRICING table in lib/ai/client.ts. Estimate: typical Brain reply spans
+  // ~2k input + ~1k output ≈ $0.021. Reserve a touch higher to avoid
+  // post-reconciliation overruns blowing the cap by a cent.
+  const TIER3_INPUT_PER_MTOK = 3;
+  const TIER3_OUTPUT_PER_MTOK = 15;
+  const ESTIMATE_USD = 0.03;
+  const MODEL_ID = process.env.AI_TIER3_MODEL ?? "claude-sonnet-4-6";
+
+  const cap = await reserveSpend(ESTIMATE_USD);
   if (!cap.allowed) {
-    const text = `Daily AI spend cap reached ($${cap.cap}). Try again tomorrow or raise the cap in Settings.`;
+    const capDollars = (cap.capCents / 100).toFixed(2);
+    const text = `Daily AI spend cap reached ($${capDollars}). Try again tomorrow or raise the cap in Settings.`;
     return new ReadableStream({
       start(c) {
         c.enqueue(new TextEncoder().encode(text));
@@ -99,22 +112,46 @@ async function streamRealResponse(opts: {
       },
     });
   }
-  const client = selectModel({ tier: 3 });
+
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+    maxRetries: 2,
+  });
+
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
+      let actualUsd = 0;
       try {
-        for await (const chunk of client.stream({
-          system: opts.systemPrompt,
-          messages: [...opts.history, { role: "user", content: opts.message }],
-          maxTokens: 1024,
-        })) {
-          controller.enqueue(encoder.encode(chunk));
+        const stream = anthropic.messages.stream(
+          {
+            model: MODEL_ID,
+            system: opts.systemPrompt,
+            messages: [...opts.history, { role: "user", content: opts.message }],
+            max_tokens: 1024,
+            temperature: 0.3,
+          },
+          { signal: opts.signal },
+        );
+
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            controller.enqueue(encoder.encode(event.delta.text));
+          }
         }
+
+        // finalMessage() resolves after stream ends with the full usage object.
+        const final = await stream.finalMessage();
+        actualUsd =
+          (final.usage.input_tokens * TIER3_INPUT_PER_MTOK +
+            final.usage.output_tokens * TIER3_OUTPUT_PER_MTOK) /
+          1_000_000;
       } catch (err) {
         controller.enqueue(encoder.encode(`\n\n[stream error: ${(err as Error).message}]`));
       } finally {
-        await recordSpend(0.02);
+        // Reconcile: if we reserved $0.03 and actually used $0.018, this
+        // returns $0.012 to the daily cap. Race-safe via INCRBY in Redis.
+        await recordActualSpend(ESTIMATE_USD, actualUsd);
         controller.close();
       }
     },
@@ -179,6 +216,7 @@ export async function POST(req: NextRequest) {
         }),
         history: [],
         message: parsed.data.message,
+        signal: req.signal,
       })
     : await streamCannedResponse(parsed.data.message, parsed.data.mode);
 
