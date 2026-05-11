@@ -1,6 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { ArrowLeft, ChevronDown, ExternalLink, Printer, Sparkles, ThumbsDown, ThumbsUp, Workflow } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,6 +25,12 @@ import { formatUsd, timeAgo } from "@/lib/utils/format";
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const opp = findOpportunity(id);
+
+  // Hooks must come BEFORE any conditional return — React rule.
+  // Initialize from opp if found, otherwise harmless defaults.
+  const [votes, setVotes] = useState({ up: opp?.votes.up ?? 0, down: opp?.votes.down ?? 0 });
+  const [voting, setVoting] = useState<"up" | "down" | null>(null);
+
   if (!opp) return <div className="p-6 text-sm text-slate-400">Opportunity not found.</div>;
 
   const sourceProducts = opp.sourceProductIds.map((pid) => mockProducts.find((p) => p.id === pid)).filter(Boolean);
@@ -30,6 +38,27 @@ export default function OpportunityDetailPage() {
   const similar = mockOpportunities
     .filter((o) => o.id !== opp.id && o.niche === opp.niche)
     .slice(0, 4);
+
+  async function castVote(direction: "up" | "down") {
+    if (voting) return;
+    setVoting(direction);
+    try {
+      const res = await fetch(`/api/opportunities/${opp!.id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+      if (!res.ok) throw new Error(`Vote failed (${res.status})`);
+      const json = await res.json();
+      const fresh = json?.data?.votes ?? json?.votes;
+      if (fresh) setVotes(fresh);
+      toast.success(direction === "up" ? "Upvoted" : "Downvoted");
+    } catch (err) {
+      toast.error((err as Error).message || "Vote failed");
+    } finally {
+      setVoting(null);
+    }
+  }
 
   return (
     <>
@@ -47,11 +76,23 @@ export default function OpportunityDetailPage() {
             <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
               <Printer className="mr-1 h-4 w-4" /> Print one-pager
             </Button>
-            <Button variant="outline" size="sm" className="print:hidden">
-              <ThumbsUp className="mr-1 h-4 w-4" /> {opp.votes.up}
+            <Button
+              variant="outline"
+              size="sm"
+              className="print:hidden"
+              disabled={voting !== null}
+              onClick={() => castVote("up")}
+            >
+              <ThumbsUp className="mr-1 h-4 w-4" /> {votes.up}
             </Button>
-            <Button variant="outline" size="sm" className="print:hidden">
-              <ThumbsDown className="mr-1 h-4 w-4" /> {opp.votes.down}
+            <Button
+              variant="outline"
+              size="sm"
+              className="print:hidden"
+              disabled={voting !== null}
+              onClick={() => castVote("down")}
+            >
+              <ThumbsDown className="mr-1 h-4 w-4" /> {votes.down}
             </Button>
             <Button size="sm" asChild className="print:hidden">
               <Link href={`/brain?mode=opportunity&id=${opp.id}`}>
