@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { desc, gt, sql } from "drizzle-orm";
+import { desc, eq, gt, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { opportunities, signals, digests } from "@/lib/db/schema";
 import { selectModel } from "@/lib/ai/client";
@@ -111,4 +111,20 @@ Write 3-4 sentences covering: what's trending, the top opportunity to act on, an
     digest: { ...digest, periodStart: digest.periodStart.toISOString(), periodEnd: digest.periodEnd.toISOString(), createdAt: digest.createdAt.toISOString() },
     history: 1,
   });
+}
+export async function GET(req: NextRequest) {
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
+  const cadence = req.nextUrl.searchParams.get("cadence") ?? "daily";
+  const db = getDb();
+
+  const rows = await db
+    .select()
+    .from(digests)
+    .where(eq(digests.cadence, cadence as typeof digests.cadence.enumValues[number]))
+    .orderBy(desc(digests.createdAt))
+    .limit(10);
+
+  return ok({ digests: rows });
 }
