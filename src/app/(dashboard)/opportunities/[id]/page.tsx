@@ -63,20 +63,35 @@ function normalizeBreakdown(raw: unknown): any {
     return raw;
   }
   const flat = (raw ?? {}) as Record<string, number>;
+  
+  // Map AI keys → SCORE_DIMENSIONS keys (demand, competition, revenue, buildEffort, trend)
   const keyMap: Record<string, string> = {
-    demandSignal: "demand_signal",
-    competition: "competition",
-    competitionLevel: "competition",
-    monetisation: "monetisation",
-    monetization: "monetisation",
-    timeToMarket: "time_to_market",
-    creatorFit: "creator_fit",
+    demandSignal:      "demand",
+    demand:            "demand",
+    competition:       "competition",
+    competitionLevel:  "competition",
+    monetisation:      "revenue",
+    monetization:      "revenue",
+    revenue:           "revenue",
+    timeToMarket:      "buildEffort",
+    buildEffort:       "buildEffort",
+    creatorFit:        "trend",
+    trend:             "trend",
   };
-  const dimensions: Record<string, { value: number; rationale?: string }> = {};
+
+  const dimensions: Record<string, { value: number; rationale?: string }> = {
+    demand:       { value: 0 },
+    competition:  { value: 0 },
+    revenue:      { value: 0 },
+    buildEffort:  { value: 0 },
+    trend:        { value: 0 },
+  };
+
   for (const [k, v] of Object.entries(flat)) {
-    const mapped = keyMap[k] ?? k;
-    dimensions[mapped] = { value: Number(v) };
+    const mapped = keyMap[k];
+    if (mapped) dimensions[mapped] = { value: Number(v) };
   }
+
   return { dimensions, ruleModifiers: [], patternModifiers: [] };
 }
 
