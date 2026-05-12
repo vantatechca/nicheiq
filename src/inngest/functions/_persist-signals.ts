@@ -42,23 +42,54 @@ function safeNiche(v: string): NicheValue {
 // ── Tier 1 batch niche classifier ─────────────────────────────────────────────
 
 async function classifyNiches(
-  items: Array<{ title: string; snippet?: string; tags?: string[] }>,
+  items: Array<{ title: string; snippet?: string; tags?: string[]; platform?: string }>,
 ): Promise<NicheValue[]> {
   if (!items.length) return [];
+
+  // Subreddit → niche direct mapping (no AI needed for these)
+  const subredditMap: Record<string, NicheValue> = {
+    "Notion":              "notion_template",
+    "NotionTemplates":     "notion_template",
+    "EtsySellers":         "etsy_printable",
+    "Etsy":                "etsy_printable",
+    "KDP":                 "kdp_low_content",
+    "selfpublishing":      "kdp_low_content",
+    "lightroom":           "lightroom_preset",
+    "gamedev":             "game_asset",
+    "gamedesign":          "game_asset",
+    "discordapp":          "discord_bot",
+    "WordpressPlugins":    "wordpress_theme",
+    "shopify":             "shopify_app",
+    "VideoEditing":        "video_template",
+    "datasets":            "dataset",
+    "ChatGPT":             "ai_prompt_pack",
+    "MidJourney":          "ai_prompt_pack",
+    "AIPromptEngineering": "ai_prompt_pack",
+    "NoCode":              "micro_saas",
+    "nocode":              "micro_saas",
+    "microsaas":           "micro_saas",
+    "SaaS":                "micro_saas",
+  };
 
   try {
     const tier1 = selectModel({ tier: 1 });
 
     const list = items
-      .map(
-        (s, i) =>
-          `${i + 1}. "${s.title}"${s.tags?.length ? ` [${s.tags.slice(0, 5).join(", ")}]` : ""}`,
-      )
+      .map((s, i) => {
+        const sub = s.tags?.[0]; // first tag is subreddit
+        const hint = sub && subredditMap[sub] ? ` [HINT: likely ${subredditMap[sub]}]` : "";
+        return `${i + 1}. "${s.title}"${s.tags?.length ? ` [subreddit: ${s.tags[0]}]` : ""}${hint}`;
+      })
       .join("\n");
 
     const { text } = await tier1.complete({
       system: `You are a digital product market classifier. Classify each item into exactly one niche.
 Valid niches: print_on_demand, etsy_printable, notion_template, gumroad_ebook, kdp_low_content, course, ai_prompt_pack, figma_kit, wordpress_theme, shopify_app, lightroom_preset, sample_pack, video_template, dataset, plr_pack, micro_saas, browser_extension, discord_bot, game_asset, other.
+
+Rules:
+- Use the subreddit as a STRONG hint. A post from r/Notion → notion_template. r/KDP → kdp_low_content. r/gamedev → game_asset. r/ChatGPT → ai_prompt_pack. r/shopify → shopify_app. r/discordapp → discord_bot. r/lightroom → lightroom_preset.
+- Only use "other" if the content has NO connection to any digital product niche.
+- When a HINT is provided, use it unless the title clearly contradicts it.
 Output ONLY a JSON array of strings, one per item, in the same order. No explanation. No markdown.`,
       messages: [
         {
@@ -66,7 +97,7 @@ Output ONLY a JSON array of strings, one per item, in the same order. No explana
           content: `Classify these ${items.length} items:\n${list}\n\nOutput exactly ${items.length} niche strings as a JSON array.`,
         },
       ],
-      maxTokens: 500,
+      maxTokens: 800,
       temperature: 0,
     });
 
@@ -74,13 +105,20 @@ Output ONLY a JSON array of strings, one per item, in the same order. No explana
     const parsed = JSON.parse(cleaned) as string[];
 
     if (!Array.isArray(parsed) || parsed.length !== items.length) {
-      return items.map(() => "other" as NicheValue);
+      // Fallback: use subreddit map directly
+      return items.map((s) => {
+        const sub = s.tags?.[0];
+        return sub ? (subredditMap[sub] ?? "other") : "other";
+      });
     }
 
     return parsed.map(safeNiche);
   } catch {
-    console.warn("[persist-signals] niche classification failed — defaulting to 'other'");
-    return items.map(() => "other" as NicheValue);
+    console.warn("[persist-signals] niche classification failed — using subreddit map");
+    return items.map((s) => {
+      const sub = s.tags?.[0];
+      return sub ? (subredditMap[sub] ?? "other") : "other";
+    });
   }
 }
 
@@ -91,12 +129,13 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
 
   // Classify niches in one batch call (Tier 1 — cheap + fast)
   const niches = await classifyNiches(
-    normalized.map((s) => ({
-      title: s.title,
-      snippet: s.snippet,
-      tags: s.tags,
-    })),
-  );
+  normalized.map((s) => ({
+    title: s.title,
+    snippet: s.snippet,
+    tags: s.tags,
+    platform: s.sourcePlatform,
+  })),
+);
 
   const rows = normalized.map((s, i) => ({
     id: crypto.randomUUID(),
