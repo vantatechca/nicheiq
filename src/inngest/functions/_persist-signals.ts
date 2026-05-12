@@ -43,7 +43,16 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
                     ?? (s.rawJson as any)?.num_favorers
                     ?? 0,
     },
-    score: 0,
+    score: Math.min(
+  100,
+  Math.log10(
+    1 +
+    ((s.rawJson as any)?.score ?? 0) +
+    ((s.rawJson as any)?.votesCount ?? 0) * 3 +
+    ((s.rawJson as any)?.num_favorers ?? 0) +
+    ((s.rawJson as any)?.num_comments ?? 0) * 0.5,
+  ) * 20,
+),
     processedAt: new Date(),
     ideaIdsLinked: [] as string[],
   }));
@@ -52,14 +61,15 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
   .insert(signals)
   .values(rows)
   .onConflictDoUpdate({
-    target: [signals.sourcePlatform, signals.sourceId],
-    set: {
-      title:       sql`excluded.title`,
-      snippet:     sql`excluded.snippet`,
-      engagement:  sql`excluded.engagement`,
-      processedAt: sql`excluded.processed_at`,
-    },
-  });
+  target: [signals.sourcePlatform, signals.sourceId],
+  set: {
+    title:       sql`excluded.title`,
+    snippet:     sql`excluded.snippet`,
+    engagement:  sql`excluded.engagement`,
+    score:       sql`excluded.score`,
+    processedAt: sql`excluded.processed_at`,
+  },
+});
 
   return result.rowCount ?? 0;
 }

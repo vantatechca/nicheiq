@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     .select()
     .from(signals)
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(signals.score), desc(signals.processedAt), desc(signals.id))
+    .orderBy(desc(signals.processedAt), desc(signals.score), desc(signals.id))
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
