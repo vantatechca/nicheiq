@@ -90,7 +90,7 @@ Write 3-4 sentences covering: what's trending, the top opportunity to act on, an
   const now = new Date();
   const digest = {
     id: digestId,
-    cadence: "on_demand" as const,
+    cadence: "daily" as const,
     periodStart: since24h,
     periodEnd: now,
     topOpportunityIds: topOpps.map((o) => o.id),
