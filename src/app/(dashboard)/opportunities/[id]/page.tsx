@@ -71,6 +71,21 @@ export default function OpportunityDetailPage() {
   );
   const opp = oppData?.opportunity ?? null;
 
+    // Add this right after `const opp = oppData?.opportunity ?? null;`
+  const buildPlan = {
+    weeks: opp?.aiBuildPlan?.weeks ?? Object.entries(opp?.aiBuildPlan ?? {})
+      .filter(([k]) => k.startsWith("phase"))
+      .map(([label, deliverables]) => ({
+        label,
+        deliverables: typeof deliverables === "string" ? [deliverables] : (deliverables as string[]),
+      })),
+    stack: opp?.aiBuildPlan?.stack ?? (opp?.aiBuildPlan as any)?.tools ?? [],
+    monetization: opp?.aiBuildPlan?.monetization ?? 
+      ((opp?.aiBuildPlan as any)?.monetisation ? [(opp?.aiBuildPlan as any).monetisation] : []),
+    risks: opp?.aiBuildPlan?.risks ?? [],
+    successMetrics: opp?.aiBuildPlan?.successMetrics ?? [],
+  };
+
   // Fetch similar opportunities (same niche). Conditional on opp loading.
   const { data: similarData } = useApi<{ opportunities: Opportunity[] }>(
     opp ? `/api/opportunities?niche=${opp.niche}&limit=5` : null,
@@ -188,7 +203,7 @@ export default function OpportunityDetailPage() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3">
-                  {opp.aiBuildPlan.weeks.map((w) => (
+                  {buildPlan.weeks.map((w) => (
                     <div key={w.label} className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">{w.label}</div>
                       <ul className="mt-2 space-y-1 text-sm text-slate-300">
@@ -208,7 +223,7 @@ export default function OpportunityDetailPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Stack</div>
                   <ul className="mt-1 flex flex-wrap gap-1">
-                    {opp.aiBuildPlan.stack.map((s) => (
+                    {buildPlan.stack.map((s: string) => (
                       <Badge key={s} variant="outline" className="text-[10px]">
                         {s}
                       </Badge>
@@ -218,7 +233,7 @@ export default function OpportunityDetailPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Monetization</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {opp.aiBuildPlan.monetization.map((m) => (
+                    {buildPlan.monetization.map((m) => (
                       <li key={m}>{m}</li>
                     ))}
                   </ul>
@@ -226,7 +241,7 @@ export default function OpportunityDetailPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Risks</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {opp.aiBuildPlan.risks.map((r) => (
+                    {buildPlan.risks.map((r) => (
                       <li key={r}>{r}</li>
                     ))}
                   </ul>
@@ -234,7 +249,7 @@ export default function OpportunityDetailPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Success metrics</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {opp.aiBuildPlan.successMetrics.map((m) => (
+                    {buildPlan.successMetrics.map((m) => (
                       <li key={m}>{m}</li>
                     ))}
                   </ul>
