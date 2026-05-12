@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, formatNumber, timeAgo } from "@/lib/utils/format";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface PricingTier {
   label: string;
@@ -46,6 +48,8 @@ interface Product {
   priceUsd: number | null;
   creatorId: string | null;
 }
+
+const [deepDiving, setDeepDiving] = useState(false);
 
 export default function CreatorDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -100,6 +104,26 @@ export default function CreatorDetailPage() {
             <Link href={`/brain?mode=creator&id=${c.id}`}>
               <Sparkles className="mr-1 h-4 w-4" /> Reverse-engineer
             </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={deepDiving}
+            onClick={async () => {
+              setDeepDiving(true);
+              try {
+                const res = await fetch(`/api/creators/${c.id}/deep-dive`, { method: "POST" });
+                if (!res.ok) throw new Error("Failed");
+                toast.success("Deep dive complete — refreshing…");
+                setTimeout(() => window.location.reload(), 1000);
+              } catch {
+                toast.error("Deep dive failed");
+              } finally {
+                setDeepDiving(false);
+              }
+            }}
+          >
+            {deepDiving ? "Analyzing…" : "Deep dive"}
           </Button>
         </div>
       </div>
