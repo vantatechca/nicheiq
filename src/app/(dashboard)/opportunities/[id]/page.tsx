@@ -18,7 +18,6 @@ import { useApi } from "@/lib/hooks/use-api";
 import { api } from "@/lib/api-client/fetcher";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 
-// Inferred shapes from the API. Lightweight — only the fields the page uses.
 interface Opportunity {
   id: string;
   title: string;
@@ -31,13 +30,7 @@ interface Opportunity {
   score: number;
   scoreBreakdown: unknown;
   aiRationale: string;
-  aiBuildPlan: {
-    weeks: { label: string; deliverables: string[] }[];
-    stack: string[];
-    monetization: string[];
-    risks: string[];
-    successMetrics: string[];
-  };
+  aiBuildPlan: unknown;
   sourceProductIds: string[];
   sourceSignalIds: string[];
   createdBy: string;
@@ -62,48 +55,84 @@ interface Signal {
   processedAt: string;
 }
 
+// ── Normalizers (outside component) ──────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeBreakdown(raw: unknown): any {
+  if (raw && typeof raw === "object" && "dimensions" in raw && "ruleModifiers" in raw) {
+    return raw;
+  }
+  const flat = (raw ?? {}) as Record<string, number>;
+  const keyMap: Record<string, string> = {
+    demandSignal: "demand_signal",
+    competition: "competition",
+    competitionLevel: "competition",
+    monetisation: "monetisation",
+    monetization: "monetisation",
+    timeToMarket: "time_to_market",
+    creatorFit: "creator_fit",
+  };
+  const dimensions: Record<string, { value: number; rationale?: string }> = {};
+  for (const [k, v] of Object.entries(flat)) {
+    const mapped = keyMap[k] ?? k;
+    dimensions[mapped] = { value: Number(v) };
+  }
+  return { dimensions, ruleModifiers: [], patternModifiers: [] };
+}
+
+function normalizeBuildPlan(raw: unknown) {
+  const p = (raw ?? {}) as Record<string, unknown>;
+  return {
+    weeks: Array.isArray(p.weeks)
+      ? (p.weeks as { label: string; deliverables: string[] }[])
+      : Object.entries(p)
+          .filter(([k]) => k.startsWith("phase"))
+          .map(([label, deliverables]) => ({
+            label,
+            deliverables:
+              typeof deliverables === "string"
+                ? [deliverables]
+                : Array.isArray(deliverables)
+                  ? (deliverables as string[])
+                  : [],
+          })),
+    stack: Array.isArray(p.stack)
+      ? (p.stack as string[])
+      : Array.isArray(p.tools)
+        ? (p.tools as string[])
+        : [],
+    monetization: Array.isArray(p.monetization)
+      ? (p.monetization as string[])
+      : typeof p.monetisation === "string"
+        ? [p.monetisation]
+        : [],
+    risks: Array.isArray(p.risks) ? (p.risks as string[]) : [],
+    successMetrics: Array.isArray(p.successMetrics) ? (p.successMetrics as string[]) : [],
+  };
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
 
-  // Fetch the main opportunity + lateral data for tabs.
   const { data: oppData, loading } = useApi<{ opportunity: Opportunity }>(
     id ? `/api/opportunities/${id}` : null,
   );
   const opp = oppData?.opportunity ?? null;
 
-    // Add this right after `const opp = oppData?.opportunity ?? null;`
-  const buildPlan = {
-    weeks: opp?.aiBuildPlan?.weeks ?? Object.entries(opp?.aiBuildPlan ?? {})
-      .filter(([k]) => k.startsWith("phase"))
-      .map(([label, deliverables]) => ({
-        label,
-        deliverables: typeof deliverables === "string" ? [deliverables] : (deliverables as string[]),
-      })),
-    stack: opp?.aiBuildPlan?.stack ?? (opp?.aiBuildPlan as any)?.tools ?? [],
-    monetization: opp?.aiBuildPlan?.monetization ?? 
-      ((opp?.aiBuildPlan as any)?.monetisation ? [(opp?.aiBuildPlan as any).monetisation] : []),
-    risks: opp?.aiBuildPlan?.risks ?? [],
-    successMetrics: opp?.aiBuildPlan?.successMetrics ?? [],
-  };
-
-  // Fetch similar opportunities (same niche). Conditional on opp loading.
   const { data: similarData } = useApi<{ opportunities: Opportunity[] }>(
     opp ? `/api/opportunities?niche=${opp.niche}&limit=5` : null,
   );
   const similar = (similarData?.opportunities ?? []).filter((o) => o.id !== opp?.id).slice(0, 4);
 
-  // Vote state — initialize at 0/0 (the previous mock-counter seed doesn't
-  // exist on the real DB row). The first /api/.../vote response populates it.
-  // Hooks must come before any conditional return — React rule.
   const [votes, setVotes] = useState({ up: 0, down: 0 });
   const [voting, setVoting] = useState<"up" | "down" | null>(null);
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-400">Loading opportunity…</div>;
-  }
-  if (!opp) {
-    return <div className="p-6 text-sm text-slate-400">Opportunity not found.</div>;
-  }
+  if (loading) return <div className="p-6 text-sm text-slate-400">Loading opportunity…</div>;
+  if (!opp) return <div className="p-6 text-sm text-slate-400">Opportunity not found.</div>;
+
+  const buildPlan = normalizeBuildPlan(opp.aiBuildPlan);
 
   async function castVote(direction: "up" | "down") {
     if (voting || !opp) return;
@@ -138,22 +167,10 @@ export default function OpportunityDetailPage() {
             <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
               <Printer className="mr-1 h-4 w-4" /> Print one-pager
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="print:hidden"
-              disabled={voting !== null}
-              onClick={() => castVote("up")}
-            >
+            <Button variant="outline" size="sm" className="print:hidden" disabled={voting !== null} onClick={() => castVote("up")}>
               <ThumbsUp className="mr-1 h-4 w-4" /> {votes.up}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="print:hidden"
-              disabled={voting !== null}
-              onClick={() => castVote("down")}
-            >
+            <Button variant="outline" size="sm" className="print:hidden" disabled={voting !== null} onClick={() => castVote("down")}>
               <ThumbsDown className="mr-1 h-4 w-4" /> {votes.down}
             </Button>
             <Button size="sm" asChild className="print:hidden">
@@ -203,6 +220,9 @@ export default function OpportunityDetailPage() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3">
+                  {buildPlan.weeks.length === 0 && (
+                    <div className="text-xs text-slate-500">No phases generated.</div>
+                  )}
                   {buildPlan.weeks.map((w) => (
                     <div key={w.label} className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">{w.label}</div>
@@ -223,35 +243,27 @@ export default function OpportunityDetailPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Stack</div>
                   <ul className="mt-1 flex flex-wrap gap-1">
-                    {buildPlan.stack.map((s: string) => (
-                      <Badge key={s} variant="outline" className="text-[10px]">
-                        {s}
-                      </Badge>
+                    {buildPlan.stack.map((s) => (
+                      <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>
                     ))}
                   </ul>
                 </div>
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Monetization</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {buildPlan.monetization.map((m) => (
-                      <li key={m}>{m}</li>
-                    ))}
+                    {buildPlan.monetization.map((m) => <li key={m}>{m}</li>)}
                   </ul>
                 </div>
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Risks</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {buildPlan.risks.map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
+                    {buildPlan.risks.map((r) => <li key={r}>{r}</li>)}
                   </ul>
                 </div>
                 <div>
                   <div className="text-xs font-semibold uppercase text-slate-400">Success metrics</div>
                   <ul className="mt-1 list-inside list-disc text-xs text-slate-300">
-                    {buildPlan.successMetrics.map((m) => (
-                      <li key={m}>{m}</li>
-                    ))}
+                    {buildPlan.successMetrics.map((m) => <li key={m}>{m}</li>)}
                   </ul>
                 </div>
               </div>
@@ -303,7 +315,7 @@ export default function OpportunityDetailPage() {
               <CardDescription>5-dimension heuristic + rules.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ScoreBar breakdown={opp.scoreBreakdown as never} />
+              <ScoreBar breakdown={normalizeBreakdown(opp.scoreBreakdown)} />
             </CardContent>
           </Card>
 
@@ -314,7 +326,7 @@ export default function OpportunityDetailPage() {
             <CardContent className="space-y-2 text-xs">
               <Row label="Created" value={timeAgo(opp.createdAt)} />
               <Row label="Updated" value={timeAgo(opp.updatedAt)} />
-              <Row label="By" value={opp.createdBy === "ai" ? "AI Tier 3" : "User"} />
+              <Row label="By" value={opp.createdBy === "system" ? "AI" : opp.createdBy} />
               <Row label="Niche" value={opp.niche.replace(/_/g, " ")} />
               <Row label="Status" value={opp.status} />
             </CardContent>
@@ -334,8 +346,6 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-// Source signals tab — fetches each signal by id and renders them.
-// Could be optimized later as a single multi-id endpoint.
 function SourceSignalsTab({ signalIds }: { signalIds: string[] }) {
   const { data, loading } = useApi<{ signals: Signal[] }>(`/api/signals?limit=100`);
   const signals = (data?.signals ?? []).filter((s) => signalIds.includes(s.id));
@@ -346,9 +356,7 @@ function SourceSignalsTab({ signalIds }: { signalIds: string[] }) {
         {signals.map((s) => (
           <div key={s.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-sm">
             <div className="flex items-center justify-between">
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {s.signalType.replace(/_/g, " ")}
-              </Badge>
+              <Badge variant="outline" className="text-[10px] uppercase">{s.signalType.replace(/_/g, " ")}</Badge>
               <span className="text-xs text-slate-500">{timeAgo(s.processedAt)}</span>
             </div>
             <div className="mt-1 line-clamp-1 font-medium">{s.title}</div>
@@ -364,7 +372,6 @@ function SourceSignalsTab({ signalIds }: { signalIds: string[] }) {
   );
 }
 
-// Source products tab — same pattern as signals.
 function SourceProductsTab({ productIds }: { productIds: string[] }) {
   const { data, loading } = useApi<{ products: Product[] }>(`/api/products?limit=100`);
   const products = (data?.products ?? []).filter((p) => productIds.includes(p.id));
@@ -373,11 +380,7 @@ function SourceProductsTab({ productIds }: { productIds: string[] }) {
     <Card className="border-slate-800 bg-slate-900/40">
       <CardContent className="space-y-2 p-3">
         {products.map((p) => (
-          <Link
-            key={p.id}
-            href={`/products/${p.id}`}
-            className="block rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900"
-          >
+          <Link key={p.id} href={`/products/${p.id}`} className="block rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">{p.title}</div>
               <span className="text-xs font-semibold text-emerald-400">{formatUsd(p.priceUsd ?? 0)}</span>
