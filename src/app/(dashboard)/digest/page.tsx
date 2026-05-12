@@ -9,6 +9,26 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatDate, formatUsd, timeAgo } from "@/lib/utils/format";
+import { useState } from "react";
+import { toast } from "sonner";
+
+// Add this state inside the component:
+const [generating, setGenerating] = useState(false);
+
+const handleGenerate = async () => {
+  setGenerating(true);
+  try {
+    const res = await fetch("/api/digest", { method: "POST" });
+    if (!res.ok) throw new Error("Failed");
+    toast.success("Digest generated!");
+    // Reload the page to show the new digest
+    window.location.reload();
+  } catch {
+    toast.error("Failed to generate digest");
+  } finally {
+    setGenerating(false);
+  }
+};
 
 interface Digest {
   id: string;
@@ -40,8 +60,9 @@ export default function DigestPage() {
         title="Digest"
         description="Daily and weekly synthesis from the Brain."
         actions={
-          <Button size="sm">
-            <Sparkles className="mr-1 h-4 w-4" /> Generate now
+          <Button size="sm" onClick={handleGenerate} disabled={generating}>
+            <Sparkles className="mr-1 h-4 w-4" />
+            {generating ? "Generating…" : "Generate now"}
           </Button>
         }
       />
