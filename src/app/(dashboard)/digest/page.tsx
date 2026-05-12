@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Mail, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,26 +11,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatDate, formatUsd, timeAgo } from "@/lib/utils/format";
-import { useState } from "react";
-import { toast } from "sonner";
-
-// Add this state inside the component:
-const [generating, setGenerating] = useState(false);
-
-const handleGenerate = async () => {
-  setGenerating(true);
-  try {
-    const res = await fetch("/api/digest", { method: "POST" });
-    if (!res.ok) throw new Error("Failed");
-    toast.success("Digest generated!");
-    // Reload the page to show the new digest
-    window.location.reload();
-  } catch {
-    toast.error("Failed to generate digest");
-  } finally {
-    setGenerating(false);
-  }
-};
 
 interface Digest {
   id: string;
@@ -44,6 +26,8 @@ interface Digest {
 }
 
 export default function DigestPage() {
+  const [generating, setGenerating] = useState(false);
+
   const { data: dailyData, loading: dailyLoading } = useApi<{ digests: Digest[] }>(
     "/api/digest?cadence=daily",
   );
@@ -53,6 +37,20 @@ export default function DigestPage() {
 
   const daily = dailyData?.digests ?? [];
   const weekly = weeklyData?.digests ?? [];
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/digest", { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Digest generated!");
+      window.location.reload();
+    } catch {
+      toast.error("Failed to generate digest");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <>
