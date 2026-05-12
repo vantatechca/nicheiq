@@ -132,9 +132,17 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
     ideaIdsLinked: [] as string[],
   }));
 
+  // Deduplicate rows by (sourcePlatform, sourceId) before insert
+  const deduped = rows.filter(
+    (row, idx, arr) =>
+      arr.findLastIndex(
+        (r) => r.sourcePlatform === row.sourcePlatform && r.sourceId === row.sourceId,
+      ) === idx,
+  );
+
   const result = await getDb()
     .insert(signals)
-    .values(rows)
+    .values(deduped)
     .onConflictDoUpdate({
       target: [signals.sourcePlatform, signals.sourceId],
       set: {
