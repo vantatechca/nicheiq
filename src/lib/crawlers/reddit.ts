@@ -1,15 +1,33 @@
 import type { CrawlerModule, RawSignal } from "./types";
 
+
 const DEFAULT_SUBS = [
+  // Existing good ones
   "Entrepreneur",
   "SideProject",
   "passive_income",
-  "Etsy",
-  "EtsySellers",
-  "digitalmarketing",
+  // Digital product specific
   "Notion",
-  "GraphicDesign",
-  "InternetIsBeautiful",
+  "NotionTemplates",
+  "EtsySellers",
+  "Etsy",
+  "KDP",
+  "selfpublishing",
+  "NoCode",
+  "nocode",
+  "microsaas",
+  "SaaS",
+  "ChatGPT",
+  "MidJourney",
+  "AIPromptEngineering",
+  "gamedev",
+  "gamedesign",
+  "discordapp",
+  "WordpressPlugins",
+  "shopify",
+  "lightroom",
+  "VideoEditing",
+  "datasets",
 ];
 
 const USER_AGENT = "nicheiq-bot/0.1 (research; contact andrei@nicheiq.com)";
