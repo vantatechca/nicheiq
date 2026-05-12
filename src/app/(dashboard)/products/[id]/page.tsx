@@ -9,6 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { PageHeader } from "@/components/shared/page-header";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, formatNumber, formatRange, timeAgo } from "@/lib/utils/format";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface Product {
   id: string;
@@ -42,6 +45,36 @@ interface Creator {
 }
 
 export default function ProductDetailPage() {
+const router = useRouter();
+const [promoting, setPromoting] = useState(false);
+
+const handlePromote = async () => {
+  if (!product) return;
+  setPromoting(true);
+  try {
+    const res = await fetch("/api/opportunities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `${product.title} — replication play`,
+        summary: `Replicate ${product.title} by ${product.creator ?? "unknown"} in the ${product.niche.replace(/_/g, " ")} niche.`,
+        niche: product.niche,
+        opportunityType: "replication",
+        buildEffort: "week",
+        projectedRevenueUsd: product.estMonthlyRevenueHigh ?? 1000,
+      }),
+    });
+    if (!res.ok) throw new Error("Failed");
+    const data = await res.json();
+    toast.success("Opportunity created!");
+    router.push(`/opportunities/${data.data.opportunity.id}`);
+  } catch {
+    toast.error("Failed to promote");
+  } finally {
+    setPromoting(false);
+  }
+};
+
   const { id } = useParams<{ id: string }>();
 
   // Main product fetch.
@@ -85,9 +118,10 @@ export default function ProductDetailPage() {
                 Source <ExternalLink className="ml-1 h-3 w-3" />
               </a>
             </Button>
-            <Button size="sm">
-              <Sparkles className="mr-1 h-4 w-4" /> Promote to opportunity
-            </Button>
+            <Button size="sm" onClick={handlePromote} disabled={promoting}>
+          <Sparkles className="mr-1 h-4 w-4" />
+          {promoting ? "Promoting…" : "Promote to opportunity"}
+        </Button>
           </>
         }
       />
