@@ -182,6 +182,22 @@ export default function OpportunityDetailPage() {
             <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
               <Printer className="mr-1 h-4 w-4" /> Print one-pager
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="print:hidden"
+              onClick={async () => {
+                const res = await fetch(`/api/opportunities/${opp.id}/score`, { method: "POST" });
+                if (res.ok) {
+                  toast.success("Rescored — refreshing…");
+                  setTimeout(() => window.location.reload(), 1000);
+                } else {
+                  toast.error("Rescore failed");
+                }
+              }}
+            >
+              Rescore
+            </Button>
             <Button variant="outline" size="sm" className="print:hidden" disabled={voting !== null} onClick={() => castVote("up")}>
               <ThumbsUp className="mr-1 h-4 w-4" /> {votes.up}
             </Button>
