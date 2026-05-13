@@ -2,7 +2,8 @@ import { inngest } from "../client";
 import { getDb } from "@/lib/db/client";
 import { opportunities, signals, digests } from "@/lib/db/schema";
 import { selectModel } from "@/lib/ai/client";
-import { desc, gt, sql, ne } from "drizzle-orm";
+import { sendDigestEmail } from "@/lib/email/digest";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 
 type Cadence = "daily" | "weekly";
 
@@ -66,24 +67,48 @@ async function buildAndPersistDigest(cadence: Cadence) {
   }
 
   const now = new Date();
+  const topProducts = topOpps.slice(0, 5).map((o) => ({
+    id: o.id,
+    title: o.title,
+    revenue: o.projectedRevenueUsd,
+  }));
+  const risingNiches = [...new Set(topOpps.map((o) => o.niche))];
+
+  // Send email — no-ops if RESEND_API_KEY is unset, so safe in mock/dev.
+  const emailResult = await sendDigestEmail({
+    cadence,
+    aiSummary,
+    topProducts,
+    risingNiches,
+    periodStart: since,
+    periodEnd: now,
+  });
+
   await db.insert(digests).values({
     id: crypto.randomUUID(),
     cadence,
     periodStart: since,
     periodEnd: now,
     topOpportunityIds: topOpps.map((o) => o.id),
-    risingNiches: [...new Set(topOpps.map((o) => o.niche))],
-    topProducts: topOpps.slice(0, 5).map((o) => ({
-      id: o.id,
-      title: o.title,
-      revenue: o.projectedRevenueUsd,
-    })),
+    risingNiches,
+    topProducts,
     aiSummary,
-    sentTo: [],
+    sentTo: emailResult.sent ? emailResult.to : [],
     createdAt: now,
   });
 
-  return { cadence, opportunities: topOpps.length, signals: totalSignals, aiSummary };
+  return {
+    cadence,
+    opportunities: topOpps.length,
+    signals: totalSignals,
+    aiSummary,
+    email: {
+      sent: emailResult.sent,
+      to: emailResult.to,
+      skipped: emailResult.skipped,
+      error: emailResult.error,
+    },
+  };
 }
 
 export const synthesizeOpportunities = inngest.createFunction(
@@ -117,7 +142,10 @@ export const synthesizeOpportunities = inngest.createFunction(
           .select({ id: signals.id, title: signals.title, score: signals.score })
           .from(signals)
           .where(
-            gt(signals.processedAt, since),
+            and(
+              gt(signals.processedAt, since),
+              eq(signals.niche, niche),
+            ),
           )
           .orderBy(desc(signals.score))
           .limit(15);
