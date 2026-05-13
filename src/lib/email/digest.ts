@@ -12,6 +12,8 @@
  *   NEXTAUTH_URL        used to build the dashboard CTA link
  */
 
+import { Resend } from "resend";
+
 type TopProduct = { id: string; title: string; revenue: number };
 
 export interface DigestEmailInput {
@@ -173,19 +175,28 @@ export async function sendDigestEmail(
   input: DigestEmailInput,
 ): Promise<SendDigestResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { sent: false, to: [], skipped: "no_api_key" };
+  if (!apiKey) {
+    console.warn("[digest-email] RESEND_API_KEY not set — skipping send");
+    return { sent: false, to: [], skipped: "no_api_key" };
+  }
 
   const recipients = (process.env.DIGEST_EMAIL_TO ?? "vantatechca@gmail.com")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!recipients.length) return { sent: false, to: [], skipped: "no_recipients" };
+  if (!recipients.length) {
+    console.warn("[digest-email] DIGEST_EMAIL_TO produced no recipients — skipping");
+    return { sent: false, to: [], skipped: "no_recipients" };
+  }
 
   const from = process.env.DIGEST_EMAIL_FROM ?? "NicheIQ <onboarding@resend.dev>";
   const { subject, html, text } = buildDigestEmail(input);
 
+  console.log(
+    `[digest-email] sending cadence=${input.cadence} to=${recipients.join(",")} from="${from}" keyPrefix=${apiKey.slice(0, 6)}`,
+  );
+
   try {
-    const { Resend } = await import("resend");
     const client = new Resend(apiKey);
     const { data, error } = await client.emails.send({
       from,
@@ -195,14 +206,17 @@ export async function sendDigestEmail(
       text,
     });
     if (error) {
+      console.error("[digest-email] Resend SDK returned error:", error);
       return {
         sent: false,
         to: recipients,
         error: error.message ?? "resend_error",
       };
     }
+    console.log(`[digest-email] sent OK id=${data?.id}`);
     return { sent: true, to: recipients, id: data?.id };
   } catch (e) {
+    console.error("[digest-email] exception during send:", e);
     return {
       sent: false,
       to: recipients,
