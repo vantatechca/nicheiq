@@ -5,6 +5,7 @@ import { opportunities, signals, digests } from "@/lib/db/schema";
 import { selectModel } from "@/lib/ai/client";
 import { ok, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
+import { sendDigestEmail } from "@/lib/email/digest";
 
 export async function POST(_req: NextRequest) {
   const session = await requireSession();
@@ -85,33 +86,60 @@ Write 3-4 sentences covering: what's trending, the top opportunity to act on, an
       : `${totalSignals} signals ingested today across ${signalStats.length} platforms. No new opportunities synthesized yet — check back in a few hours.`;
   }
 
-  // ── Persist digest ─────────────────────────────────────────────────────────
+  // ── Build digest payload ──────────────────────────────────────────────────
   const digestId = crypto.randomUUID();
   const now = new Date();
+  const topProducts = topOpps.slice(0, 5).map((o) => ({
+    id: o.id,
+    title: o.title,
+    revenue: o.projectedRevenueUsd,
+  }));
+  const risingNiches = [...new Set(topOpps.map((o) => o.niche))];
+
+  // ── Send email (no-ops if RESEND_API_KEY is unset) ────────────────────────
+  const emailResult = await sendDigestEmail({
+    cadence: "daily",
+    aiSummary,
+    topProducts,
+    risingNiches,
+    periodStart: since24h,
+    periodEnd: now,
+  });
+
+  // ── Persist digest with sentTo populated ──────────────────────────────────
   const digest = {
     id: digestId,
     cadence: "daily" as const,
     periodStart: since24h,
     periodEnd: now,
     topOpportunityIds: topOpps.map((o) => o.id),
-    risingNiches: [...new Set(topOpps.map((o) => o.niche))],
-    topProducts: topOpps.slice(0, 5).map((o) => ({
-      id: o.id,
-      title: o.title,
-      revenue: o.projectedRevenueUsd,
-    })),
+    risingNiches,
+    topProducts,
     aiSummary,
-    sentTo: [] as string[],
+    sentTo: emailResult.sent ? emailResult.to : [],
     createdAt: now,
   };
 
   await db.insert(digests).values(digest).onConflictDoNothing();
 
   return ok({
-    digest: { ...digest, periodStart: digest.periodStart.toISOString(), periodEnd: digest.periodEnd.toISOString(), createdAt: digest.createdAt.toISOString() },
+    digest: {
+      ...digest,
+      periodStart: digest.periodStart.toISOString(),
+      periodEnd: digest.periodEnd.toISOString(),
+      createdAt: digest.createdAt.toISOString(),
+    },
+    email: {
+      sent: emailResult.sent,
+      to: emailResult.to,
+      id: emailResult.id,
+      skipped: emailResult.skipped,
+      error: emailResult.error,
+    },
     history: 1,
   });
 }
+
 export async function GET(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
