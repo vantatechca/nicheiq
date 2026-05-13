@@ -1,159 +1,179 @@
-"use client";
+import { NextRequest } from "next/server";
+import { desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { opportunities, signals, digests } from "@/lib/db/schema";
+import { selectModel } from "@/lib/ai/client";
+import { ok, unauthorized } from "@/lib/api/response";
+import { requireSession } from "@/lib/auth/session";
+import { sendDigestEmail } from "@/lib/email/digest";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Mail, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/shared/page-header";
-import { useApi } from "@/lib/hooks/use-api";
-import { formatDate, formatUsd, timeAgo } from "@/lib/utils/format";
+export async function POST(_req: NextRequest) {
+  const session = await requireSession();
+  if (!session) return unauthorized();
 
-interface Digest {
-  id: string;
-  cadence: "daily" | "weekly";
-  periodStart: string;
-  periodEnd: string;
-  createdAt: string;
-  aiSummary: string;
-  topOpportunityIds: string[];
-  risingNiches: string[];
-  topProducts: { id: string; title: string; revenue: number }[];
-  sentTo: string[];
-}
+  const db = getDb();
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-export default function DigestPage() {
-  const [generating, setGenerating] = useState(false);
+  // ── Fetch top opportunities (last 7 days) ──────────────────────────────────
+  const topOpps = await db
+    .select({
+      id: opportunities.id,
+      title: opportunities.title,
+      summary: opportunities.summary,
+      niche: opportunities.niche,
+      score: opportunities.score,
+      projectedRevenueUsd: opportunities.projectedRevenueUsd,
+      opportunityType: opportunities.opportunityType,
+      buildEffort: opportunities.buildEffort,
+    })
+    .from(opportunities)
+    .where(gt(opportunities.createdAt, since7d))
+    .orderBy(desc(opportunities.score))
+    .limit(10);
 
-  const { data: dailyData, loading: dailyLoading } = useApi<{ digests: Digest[] }>(
-    "/api/digest?cadence=daily",
-  );
-  const { data: weeklyData, loading: weeklyLoading } = useApi<{ digests: Digest[] }>(
-    "/api/digest?cadence=weekly",
-  );
+  // ── Fetch signal counts by platform (last 24h) ─────────────────────────────
+  const signalStats = await db
+    .select({
+      platform: signals.sourcePlatform,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(signals)
+    .where(gt(signals.processedAt, since24h))
+    .groupBy(signals.sourcePlatform);
 
-  const daily = dailyData?.digests ?? [];
-  const weekly = weeklyData?.digests ?? [];
+  const totalSignals = signalStats.reduce((a, s) => a + s.count, 0);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      const res = await fetch("/api/digest", { method: "POST" });
-      if (!res.ok) throw new Error("Failed");
-      toast.success("Digest generated!");
-      window.location.reload();
-    } catch {
-      toast.error("Failed to generate digest");
-    } finally {
-      setGenerating(false);
-    }
+  // ── Generate AI summary with Tier 3 ───────────────────────────────────────
+  let aiSummary = "";
+  try {
+    const tier3 = selectModel({ tier: 3 });
+    const oppList = topOpps
+      .slice(0, 6)
+      .map(
+        (o, i) =>
+          `${i + 1}. "${o.title}" — ${o.niche.replace(/_/g, " ")} — score ${Math.round(o.score)} — $${Math.round(o.projectedRevenueUsd)}/mo projected`,
+      )
+      .join("\n");
+
+    const platformList = signalStats
+      .map((s) => `${s.platform}: ${s.count} signals`)
+      .join(", ");
+
+    const { text } = await tier3.complete({
+      system: `You are a sharp digital product market analyst writing a concise daily digest for a solo founder. 
+Be direct, specific, and actionable. No fluff. Max 4 sentences.`,
+      messages: [
+        {
+          role: "user",
+          content: `Write a daily digest summary based on this data:
+
+Top opportunities today:
+${oppList || "No new opportunities scored today."}
+
+Signal activity (last 24h): ${totalSignals} total signals — ${platformList || "none"}
+
+Write 3-4 sentences covering: what's trending, the top opportunity to act on, and one insight.`,
+        },
+      ],
+      maxTokens: 300,
+      temperature: 0.5,
+    });
+    aiSummary = text.trim();
+  } catch {
+    aiSummary = topOpps.length
+      ? `${topOpps.length} new opportunities scored today. Top pick: "${topOpps[0]?.title}" in ${topOpps[0]?.niche.replace(/_/g, " ")} with a score of ${Math.round(topOpps[0]?.score ?? 0)}. ${totalSignals} signals ingested across ${signalStats.length} platforms in the last 24h.`
+      : `${totalSignals} signals ingested today across ${signalStats.length} platforms. No new opportunities synthesized yet — check back in a few hours.`;
+  }
+
+  // ── Build digest payload ──────────────────────────────────────────────────
+  const digestId = crypto.randomUUID();
+  const now = new Date();
+  const topProducts = topOpps.slice(0, 5).map((o) => ({
+    id: o.id,
+    title: o.title,
+    revenue: o.projectedRevenueUsd,
+  }));
+  const risingNiches = [...new Set(topOpps.map((o) => o.niche))];
+
+  // ── Send email (no-ops if RESEND_API_KEY is unset) ────────────────────────
+  const emailResult = await sendDigestEmail({
+    cadence: "daily",
+    aiSummary,
+    topProducts,
+    risingNiches,
+    periodStart: since24h,
+    periodEnd: now,
+  });
+
+  // ── Persist digest with sentTo populated ──────────────────────────────────
+  const digest = {
+    id: digestId,
+    cadence: "daily" as const,
+    periodStart: since24h,
+    periodEnd: now,
+    topOpportunityIds: topOpps.map((o) => o.id),
+    risingNiches,
+    topProducts,
+    aiSummary,
+    sentTo: emailResult.sent ? emailResult.to : [],
+    createdAt: now,
   };
 
-  return (
-    <>
-      <PageHeader
-        title="Digest"
-        description="Daily and weekly synthesis from the Brain."
-        actions={
-          <Button size="sm" onClick={handleGenerate} disabled={generating}>
-            <Sparkles className="mr-1 h-4 w-4" />
-            {generating ? "Generating…" : "Generate now"}
-          </Button>
-        }
-      />
+  await db.insert(digests).values(digest).onConflictDoNothing();
 
-      <Tabs defaultValue="daily">
-        <TabsList>
-          <TabsTrigger value="daily">Daily ({daily.length})</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly ({weekly.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="daily" className="grid gap-3 lg:grid-cols-2">
-          {dailyLoading && <div className="text-xs text-slate-500">Loading…</div>}
-          {!dailyLoading && daily.length === 0 && (
-            <div className="text-xs text-slate-500">No daily digests yet.</div>
-          )}
-          {daily.map((d) => (
-            <DigestCard key={d.id} digest={d} />
-          ))}
-        </TabsContent>
-        <TabsContent value="weekly" className="grid gap-3 lg:grid-cols-2">
-          {weeklyLoading && <div className="text-xs text-slate-500">Loading…</div>}
-          {!weeklyLoading && weekly.length === 0 && (
-            <div className="text-xs text-slate-500">No weekly digests yet.</div>
-          )}
-          {weekly.map((d) => (
-            <DigestCard key={d.id} digest={d} />
-          ))}
-        </TabsContent>
-      </Tabs>
-    </>
-  );
+  return ok({
+    digest: {
+      ...digest,
+      periodStart: digest.periodStart.toISOString(),
+      periodEnd: digest.periodEnd.toISOString(),
+      createdAt: digest.createdAt.toISOString(),
+    },
+    email: {
+      sent: emailResult.sent,
+      to: emailResult.to,
+      id: emailResult.id,
+      skipped: emailResult.skipped,
+      error: emailResult.error,
+    },
+    history: 1,
+  });
 }
 
-function DigestCard({ digest }: { digest: Digest }) {
-  return (
-    <Card className="border-slate-800 bg-slate-900/40">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">
-            {formatDate(digest.periodStart, "MMM d")} – {formatDate(digest.periodEnd, "MMM d")}
-          </CardTitle>
-          <Badge variant="info" className="capitalize">
-            {digest.cadence}
-          </Badge>
-        </div>
-        <CardDescription>{timeAgo(digest.createdAt)}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <p className="text-slate-300">{digest.aiSummary}</p>
-        <div>
-          <div className="text-xs uppercase text-slate-500">Top opportunities</div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {digest.topOpportunityIds.map((id) => (
-              <Link
-                key={id}
-                href={`/opportunities/${id}`}
-                className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono hover:bg-slate-700"
-              >
-                {id}
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs uppercase text-slate-500">Rising niches</div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {digest.risingNiches.map((n) => (
-              <Badge key={n} variant="outline" className="text-[10px]">
-                {n.replace(/_/g, " ")}
-              </Badge>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs uppercase text-slate-500">Top products</div>
-          <ul className="mt-1 space-y-1">
-            {digest.topProducts.map((p) => (
-              <li key={p.id} className="flex justify-between rounded-md bg-slate-950/40 px-2 py-1 text-xs">
-                <span className="line-clamp-1">{p.title}</span>
-                <span className="text-emerald-400">{formatUsd(p.revenue, { compact: true })}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-slate-500">
-          <span>
-            <Mail className="mr-1 inline h-3 w-3" /> sent to {digest.sentTo.length}{" "}
-            {digest.sentTo.length === 1 ? "recipient" : "recipients"}
-          </span>
-          <Button variant="ghost" size="sm" className="h-6 text-xs">
-            Resend
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+export async function GET(req: NextRequest) {
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
+  const cadence = req.nextUrl.searchParams.get("cadence") ?? "daily";
+  const db = getDb();
+
+  const rows = await db
+    .select()
+    .from(digests)
+    .where(eq(digests.cadence, cadence as typeof digests.cadence.enumValues[number]))
+    .orderBy(desc(digests.createdAt))
+    .limit(10);
+
+  // Enrich topOpportunityIds with titles so the UI can render readable labels
+  // instead of raw UUIDs. Single round-trip across all digests on screen.
+  const allOppIds = [
+    ...new Set(rows.flatMap((r) => r.topOpportunityIds ?? [])),
+  ];
+  const titleRows = allOppIds.length
+    ? await db
+        .select({ id: opportunities.id, title: opportunities.title })
+        .from(opportunities)
+        .where(inArray(opportunities.id, allOppIds))
+    : [];
+  const titleMap = new Map(titleRows.map((o) => [o.id, o.title]));
+
+  const enriched = rows.map((r) => ({
+    ...r,
+    topOpportunities: (r.topOpportunityIds ?? []).map((id) => ({
+      id,
+      title: titleMap.get(id) ?? null,
+    })),
+  }));
+
+  return ok({ digests: enriched });
 }

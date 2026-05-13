@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { desc, eq, gt, sql } from "drizzle-orm";
+import { desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { opportunities, signals, digests } from "@/lib/db/schema";
 import { selectModel } from "@/lib/ai/client";
@@ -154,5 +154,26 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(digests.createdAt))
     .limit(10);
 
-  return ok({ digests: rows });
+  // Enrich topOpportunityIds with titles so the UI can render readable labels
+  // instead of raw UUIDs. Single round-trip across all digests on screen.
+  const allOppIds = [
+    ...new Set(rows.flatMap((r) => r.topOpportunityIds ?? [])),
+  ];
+  const titleRows = allOppIds.length
+    ? await db
+        .select({ id: opportunities.id, title: opportunities.title })
+        .from(opportunities)
+        .where(inArray(opportunities.id, allOppIds))
+    : [];
+  const titleMap = new Map(titleRows.map((o) => [o.id, o.title]));
+
+  const enriched = rows.map((r) => ({
+    ...r,
+    topOpportunities: (r.topOpportunityIds ?? []).map((id) => ({
+      id,
+      title: titleMap.get(id) ?? null,
+    })),
+  }));
+
+  return ok({ digests: enriched });
 }
