@@ -1,5 +1,6 @@
 import type { CrawlerModule, RawSignal } from "./types";
 
+
 const ETSY_API_BASE = "https://openapi.etsy.com/v3/application";
 
 const DEFAULT_KEYWORDS = [

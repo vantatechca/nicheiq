@@ -19,26 +19,59 @@ import { sql } from "drizzle-orm";
 export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "viewer"]);
 
 export const nicheEnum = pgEnum("niche", [
-  "print_on_demand",
-  "etsy_printable",
-  "notion_template",
-  "gumroad_ebook",
-  "kdp_low_content",
-  "course",
-  "ai_prompt_pack",
-  "figma_kit",
-  "wordpress_theme",
-  "shopify_app",
-  "lightroom_preset",
-  "sample_pack",
-  "video_template",
-  "dataset",
-  "plr_pack",
-  "micro_saas",
-  "browser_extension",
-  "discord_bot",
-  "game_asset",
-  "other",
+  // Productivity Templates
+  "notion_template", "excel_template", "google_sheets_template",
+  "airtable_template", "powerpoint_template", "google_slides_template",
+  "clickup_template", "trello_template",
+  // Printables
+  "etsy_printable", "wedding_printable", "party_printable",
+  "holiday_printable", "kids_activity_printable", "homeschool_printable",
+  "coloring_page", "sticker_sheet",
+  // Planners & Trackers
+  "planner_printable", "budget_tracker", "habit_tracker",
+  "meal_planner", "fitness_planner", "travel_planner",
+  "content_calendar", "project_planner",
+  // Business Templates
+  "resume_template", "business_plan_template", "pitch_deck_template",
+  "invoice_template", "contract_template", "sop_template",
+  "business_card_template", "email_template",
+  // Marketing
+  "social_media_template", "instagram_template", "canva_template",
+  "youtube_thumbnail", "tiktok_template", "newsletter_template",
+  "brand_kit", "logo_template",
+  // Design Assets
+  "figma_kit", "procreate_brush", "photoshop_action", "lightroom_preset",
+  "illustration_pack", "icon_pack", "mockup_template",
+  "font_bundle", "color_palette", "svg_cut_file",
+  // Print on Demand
+  "print_on_demand", "sublimation_design", "embroidery_design",
+  "clipart_pack", "pattern_design",
+  // Music & Audio
+  "sample_pack", "midi_pack", "drum_kit",
+  "sound_effect_pack", "music_loop_pack",
+  // Video
+  "video_template", "video_lut", "motion_graphic",
+  "youtube_banner", "intro_template",
+  // Education & Info
+  "gumroad_ebook", "mini_course", "workbook", "swipe_file",
+  "checklist_pack", "study_guide", "flashcard_pack", "language_learning",
+  // Books & Publishing
+  "kdp_low_content", "journal_template", "planner_book",
+  // AI Tools
+  "ai_prompt_pack", "chatgpt_prompt_pack", "midjourney_prompt_pack",
+  "ai_workflow_template",
+  // Tech & Dev
+  "wordpress_theme", "shopify_app", "browser_extension", "discord_bot",
+  "micro_saas", "game_asset", "unity_asset", "website_template",
+  // Data & Finance
+  "dataset", "financial_model", "crm_template",
+  // PLR Content
+  "plr_pack", "plr_articles", "plr_social_posts",
+  // Lifestyle
+  "recipe_collection", "wedding_planner_kit", "event_planner_kit",
+  "kids_worksheet", "educational_poster", "goal_setting_workbook",
+  // Legacy / catch-all
+  "course", "other",
 ]);
 
 export const productStatusEnum = pgEnum("product_status", [
