@@ -36,7 +36,13 @@ jobs:
           USE_MOCK: "true"
           NEXTAUTH_SECRET: "ci-secret-not-real"
 
-  e2e:
+      - name: Build
+        run: npm run build
+        env:
+          USE_MOCK: "true"
+          NEXTAUTH_SECRET: "ci-secret-not-real"
+
+  e2e: # ← this is the start of the next job, leave it alone
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: verify
