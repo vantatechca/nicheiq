@@ -1,6 +1,16 @@
 "use client";
 
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from "recharts";
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Area,
+  AreaChart,
+} from "recharts";
 
 interface Props {
   data: { date: string; value: number }[];
@@ -9,8 +19,16 @@ interface Props {
   color?: string;
 }
 
-export function RechartsLine({ data, height = 200, variant = "area", color = "hsl(var(--primary))" }: Props) {
-  const formatted = data.map((d) => ({ ...d, label: new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) }));
+export function RechartsLine({
+  data,
+  height = 200,
+  variant = "area",
+  color = "hsl(var(--primary))",
+}: Props) {
+  const formatted = data.map((d) => ({
+    ...d,
+    label: new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+  }));
   const Comp = variant === "line" ? LineChart : AreaChart;
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -22,8 +40,19 @@ export function RechartsLine({ data, height = 200, variant = "area", color = "hs
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-        <XAxis dataKey="label" stroke="rgba(255,255,255,0.4)" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-        <YAxis stroke="rgba(255,255,255,0.4)" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+        <XAxis
+          dataKey="label"
+          stroke="rgba(255,255,255,0.4)"
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          stroke="rgba(255,255,255,0.4)"
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          axisLine={false}
+        />
         <Tooltip
           contentStyle={{
             background: "rgba(15,23,42,0.95)",
@@ -33,7 +62,14 @@ export function RechartsLine({ data, height = 200, variant = "area", color = "hs
           }}
         />
         {variant === "line" ? (
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
         ) : (
           <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#rcg)" />
         )}

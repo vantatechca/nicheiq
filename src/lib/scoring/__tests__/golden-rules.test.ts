@@ -41,8 +41,12 @@ describe("applyGoldenRules", () => {
   });
 
   it("boost adds positive delta scaled by weight (×20)", () => {
-    const w1 = applyGoldenRules(opp, [rule({ keywords: ["notion"], ruleType: "boost", weight: 1 })]);
-    const w05 = applyGoldenRules(opp, [rule({ keywords: ["notion"], ruleType: "boost", weight: 0.5 })]);
+    const w1 = applyGoldenRules(opp, [
+      rule({ keywords: ["notion"], ruleType: "boost", weight: 1 }),
+    ]);
+    const w05 = applyGoldenRules(opp, [
+      rule({ keywords: ["notion"], ruleType: "boost", weight: 0.5 }),
+    ]);
     expect(w1.delta).toBeGreaterThan(w05.delta);
   });
 

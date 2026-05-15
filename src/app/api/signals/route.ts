@@ -18,11 +18,10 @@ export async function GET(req: NextRequest) {
   const db = getDb();
   const conditions: SQL[] = [];
 
-  if (niche)
-    conditions.push(eq(signals.niche, niche as typeof signals.niche.enumValues[number]));
+  if (niche) conditions.push(eq(signals.niche, niche as (typeof signals.niche.enumValues)[number]));
   if (signalType)
     conditions.push(
-      eq(signals.signalType, signalType as typeof signals.signalType.enumValues[number]),
+      eq(signals.signalType, signalType as (typeof signals.signalType.enumValues)[number]),
     );
 
   // Keyset on score desc, then processedAt desc as tiebreaker for stable ordering.

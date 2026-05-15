@@ -12,9 +12,16 @@ test("login → dashboard → opportunity → ask Brain → vote", async ({ page
   await expect(page.getByText("Top opportunities today")).toBeVisible();
 
   // 3. Open first opportunity
-  await page.getByRole("link", { name: /opportunity_/i }).first().click().catch(async () => {
-    await page.getByText(/score \d+/i).first().click();
-  });
+  await page
+    .getByRole("link", { name: /opportunity_/i })
+    .first()
+    .click()
+    .catch(async () => {
+      await page
+        .getByText(/score \d+/i)
+        .first()
+        .click();
+    });
   await expect(page.url()).toMatch(/\/opportunities\//);
 
   // 4. Click Ask Brain (deep link to brain)
@@ -25,7 +32,11 @@ test("login → dashboard → opportunity → ask Brain → vote", async ({ page
   // 5. Send a chat message
   const textarea = page.getByPlaceholder(/Pressure-test/i);
   await textarea.fill("What should I build this weekend?");
-  await page.getByRole("button").filter({ has: page.locator("svg") }).last().click();
+  await page
+    .getByRole("button")
+    .filter({ has: page.locator("svg") })
+    .last()
+    .click();
 
   // Streamed canned response should arrive within 8s
   await expect(page.getByText(/jump out|surface|deep/i).first()).toBeVisible({ timeout: 8_000 });

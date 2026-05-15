@@ -6,7 +6,13 @@ interface Props {
   className?: string;
 }
 
-export function Sparkline({ data, width = 120, height = 36, color = "currentColor", className }: Props) {
+export function Sparkline({
+  data,
+  width = 120,
+  height = 36,
+  color = "currentColor",
+  className,
+}: Props) {
   if (data.length === 0) return null;
   const max = Math.max(...data.map((d) => d.value));
   const min = Math.min(...data.map((d) => d.value));
@@ -20,7 +26,13 @@ export function Sparkline({ data, width = 120, height = 36, color = "currentColo
     .join(" ");
   return (
     <svg width={width} height={height} className={className} aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" points={points} />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        points={points}
+      />
     </svg>
   );
 }

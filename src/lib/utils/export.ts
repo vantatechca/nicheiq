@@ -27,10 +27,7 @@ export function downloadCsv<T extends Record<string, unknown>>(filename: string,
     }
     return s;
   };
-  const lines = [
-    cols.join(","),
-    ...rows.map((r) => cols.map((c) => escape(r[c])).join(",")),
-  ];
+  const lines = [cols.join(","), ...rows.map((r) => cols.map((c) => escape(r[c])).join(","))];
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   triggerDownload(filename, blob);
 }

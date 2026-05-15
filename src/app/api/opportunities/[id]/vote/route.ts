@@ -72,12 +72,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const db = getDb();
   await db
     .delete(opportunityVotes)
-    .where(
-      and(
-        eq(opportunityVotes.opportunityId, params.id),
-        eq(opportunityVotes.userId, userId),
-      ),
-    );
+    .where(and(eq(opportunityVotes.opportunityId, params.id), eq(opportunityVotes.userId, userId)));
 
   const counts = await db
     .select({

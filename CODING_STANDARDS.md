@@ -119,7 +119,8 @@ const tier3 = selectModel({ tier: 3 });
 for await (const chunk of tier3.stream({
   system: assembleContext({ mode: "global", userId }),
   messages: [{ role: "user", content: prompt }],
-})) yield chunk;
+}))
+  yield chunk;
 ```
 
 - [ ] Tiered model selection: cheap (Qwen via OpenRouter) → mid (Claude Haiku) → premium (Claude Sonnet)

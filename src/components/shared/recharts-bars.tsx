@@ -13,8 +13,19 @@ export function RechartsBars({ data, height = 220, color = "hsl(var(--primary))"
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-        <XAxis dataKey="label" stroke="rgba(255,255,255,0.4)" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-        <YAxis stroke="rgba(255,255,255,0.4)" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+        <XAxis
+          dataKey="label"
+          stroke="rgba(255,255,255,0.4)"
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          stroke="rgba(255,255,255,0.4)"
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          axisLine={false}
+        />
         <Tooltip
           contentStyle={{
             background: "rgba(15,23,42,0.95)",

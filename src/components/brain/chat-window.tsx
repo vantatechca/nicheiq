@@ -17,7 +17,13 @@ interface Props {
   placeholder?: string;
 }
 
-export function ChatWindow({ initialMessages, mode, conversationId, contextRefs, placeholder }: Props) {
+export function ChatWindow({
+  initialMessages,
+  mode,
+  conversationId,
+  contextRefs,
+  placeholder,
+}: Props) {
   const { messages, send, pending } = useBrainChat(initialMessages ?? []);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,9 +98,7 @@ function MessageBubble({ message }: { message: Message }) {
       </Avatar>
       <div
         className={`max-w-[80%] whitespace-pre-wrap rounded-lg border p-3 text-sm ${
-          isUser
-            ? "border-primary/30 bg-primary/10"
-            : "border-slate-800 bg-slate-900/60"
+          isUser ? "border-primary/30 bg-primary/10" : "border-slate-800 bg-slate-900/60"
         }`}
       >
         {message.content || <span className="text-slate-500">…</span>}

@@ -34,18 +34,27 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
 
   // Build WHERE conditions. Each is type-checked against the enum at compile time.
   const conditions: SQL[] = [];
-  if (niche) conditions.push(eq(opportunities.niche, niche as typeof opportunities.niche.enumValues[number]));
+  if (niche)
+    conditions.push(
+      eq(opportunities.niche, niche as (typeof opportunities.niche.enumValues)[number]),
+    );
   if (type)
     conditions.push(
-      eq(opportunities.opportunityType, type as typeof opportunities.opportunityType.enumValues[number]),
+      eq(
+        opportunities.opportunityType,
+        type as (typeof opportunities.opportunityType.enumValues)[number],
+      ),
     );
   if (effort)
     conditions.push(
-      eq(opportunities.buildEffort, effort as typeof opportunities.buildEffort.enumValues[number]),
+      eq(
+        opportunities.buildEffort,
+        effort as (typeof opportunities.buildEffort.enumValues)[number],
+      ),
     );
   if (status)
     conditions.push(
-      eq(opportunities.status, status as typeof opportunities.status.enumValues[number]),
+      eq(opportunities.status, status as (typeof opportunities.status.enumValues)[number]),
     );
   if (minScore > 0) conditions.push(gte(opportunities.score, minScore));
   if (search.trim()) {
@@ -72,17 +81,15 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(...orderBy)
       .limit(200),
-    db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(opportunities),
+    db.select({ count: sql<number>`COUNT(*)::int` }).from(opportunities),
   ]);
 
   const total = totalRow[0]?.count ?? 0;
 
   return (
     <OpportunitiesView
-        opportunities={rows as never[]}
-        total={total}
+      opportunities={rows as never[]}
+      total={total}
       filters={{ niche, type, effort, status, minScore, search, sort }}
     />
   );

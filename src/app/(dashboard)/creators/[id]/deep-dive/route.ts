@@ -12,11 +12,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const db = getDb();
 
-  const [creator] = await db
-    .select()
-    .from(creators)
-    .where(eq(creators.id, params.id))
-    .limit(1);
+  const [creator] = await db.select().from(creators).where(eq(creators.id, params.id)).limit(1);
   if (!creator) return notFound("Creator not found");
 
   // Fetch creator's products
@@ -69,7 +65,10 @@ Analyze this creator and output their playbook:
   // Parse playbook
   let playbook = {};
   try {
-    const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const cleaned = text
+      .replace(/^```json\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
     playbook = JSON.parse(cleaned);
   } catch {
     playbook = { signatureStyle: text.slice(0, 500) };

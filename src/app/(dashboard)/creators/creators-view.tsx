@@ -80,7 +80,9 @@ export function CreatorsView({ creators, total, filters }: Props) {
         </CardContent>
       </Card>
 
-      <Card className={`border-slate-800 bg-slate-900/40 ${isPending ? "opacity-60 transition-opacity" : ""}`}>
+      <Card
+        className={`border-slate-800 bg-slate-900/40 ${isPending ? "opacity-60 transition-opacity" : ""}`}
+      >
         <CardHeader>
           <CardTitle>Leaderboard</CardTitle>
           <CardDescription>Click to open the playbook.</CardDescription>
@@ -93,7 +95,7 @@ export function CreatorsView({ creators, total, filters }: Props) {
                 href={`/creators/${c.id}`}
                 className="flex items-center gap-3 rounded-md border border-transparent px-2 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-950"
               >
-                <div className="w-6 text-center text-xs font-mono text-slate-500">{i + 1}</div>
+                <div className="w-6 text-center font-mono text-xs text-slate-500">{i + 1}</div>
                 <img src={c.avatarUrl} alt="" className="h-8 w-8 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{c.displayName}</div>
@@ -105,7 +107,9 @@ export function CreatorsView({ creators, total, filters }: Props) {
                   <div className="font-semibold text-emerald-400">
                     {formatUsd(c.totalEstRevenueUsd, { compact: true })}
                   </div>
-                  <div className="text-slate-500">{formatNumber(c.followerCount, { compact: true })} followers</div>
+                  <div className="text-slate-500">
+                    {formatNumber(c.followerCount, { compact: true })} followers
+                  </div>
                 </div>
                 <div className="hidden flex-wrap gap-1 lg:flex">
                   {c.niches.slice(0, 2).map((n) => (

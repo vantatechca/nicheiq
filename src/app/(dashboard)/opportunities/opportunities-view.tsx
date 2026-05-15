@@ -105,7 +105,9 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
 
   async function bulkAction(label: string) {
     if (selected.size === 0) return;
-    toast.success(`${label} ${selected.size} opportunit${selected.size === 1 ? "y" : "ies"} (mock)`);
+    toast.success(
+      `${label} ${selected.size} opportunit${selected.size === 1 ? "y" : "ies"} (mock)`,
+    );
     setSelected(new Set());
   }
 
@@ -187,7 +189,8 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
             </div>
             {filterCount > 0 ? (
               <Button variant="ghost" size="sm" onClick={clearAllFilters}>
-                <X className="mr-1 h-3 w-3" /> Clear {filterCount} filter{filterCount === 1 ? "" : "s"}
+                <X className="mr-1 h-3 w-3" /> Clear {filterCount} filter
+                {filterCount === 1 ? "" : "s"}
               </Button>
             ) : null}
           </div>
@@ -225,7 +228,9 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           <span className="font-medium text-primary">{selected.size} selected</span>
           {selected.size >= 2 && selected.size <= 4 ? (
             <Button size="sm" asChild>
-              <Link href={`/opportunities/compare?ids=${Array.from(selected).join(",")}`}>Compare</Link>
+              <Link href={`/opportunities/compare?ids=${Array.from(selected).join(",")}`}>
+                Compare
+              </Link>
             </Button>
           ) : null}
           <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted")}>
@@ -240,7 +245,12 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           <Button size="sm" variant="outline" onClick={() => bulkAction("Archived")}>
             Archive
           </Button>
-          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSelected(new Set())}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => setSelected(new Set())}
+          >
             Clear
           </Button>
         </div>
@@ -319,9 +329,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
               <Button variant="outline" size="sm" onClick={clearAllFilters}>
                 Clear filters
               </Button>
-              <OpportunityCreateDialog
-                trigger={<Button size="sm">Add manually</Button>}
-              />
+              <OpportunityCreateDialog trigger={<Button size="sm">Add manually</Button>} />
             </div>
           </div>
         ) : null}

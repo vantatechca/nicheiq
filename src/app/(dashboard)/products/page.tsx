@@ -28,12 +28,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
   // Build WHERE conditions.
   const conditions: SQL[] = [];
   if (niche)
-    conditions.push(
-      eq(products.niche, niche as typeof products.niche.enumValues[number]),
-    );
+    conditions.push(eq(products.niche, niche as (typeof products.niche.enumValues)[number]));
   if (platform)
     conditions.push(
-      eq(products.sourcePlatform, platform as typeof products.sourcePlatform.enumValues[number]),
+      eq(products.sourcePlatform, platform as (typeof products.sourcePlatform.enumValues)[number]),
     );
   if (search.trim()) {
     conditions.push(ilike(products.title, `%${search.trim()}%`));
@@ -50,9 +48,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(products.estMonthlyRevenueHigh), desc(products.id))
       .limit(200),
-    db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(products),
+    db.select({ count: sql<number>`COUNT(*)::int` }).from(products),
   ]);
 
   const total = totalRow[0]?.count ?? 0;

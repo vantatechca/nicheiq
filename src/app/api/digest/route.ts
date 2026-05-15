@@ -56,9 +56,7 @@ export async function POST(_req: NextRequest) {
       )
       .join("\n");
 
-    const platformList = signalStats
-      .map((s) => `${s.platform}: ${s.count} signals`)
-      .join(", ");
+    const platformList = signalStats.map((s) => `${s.platform}: ${s.count} signals`).join(", ");
 
     const { text } = await tier3.complete({
       system: `You are a sharp digital product market analyst writing a concise daily digest for a solo founder. 
@@ -150,7 +148,7 @@ export async function GET(req: NextRequest) {
   const rows = await db
     .select()
     .from(digests)
-    .where(eq(digests.cadence, cadence as typeof digests.cadence.enumValues[number]))
+    .where(eq(digests.cadence, cadence as (typeof digests.cadence.enumValues)[number]))
     .orderBy(desc(digests.createdAt))
     .limit(10);
 

@@ -18,7 +18,15 @@ interface OpportunityShape {
 
 function matchKeywords(o: OpportunityShape, keywords: string[]) {
   const haystack = (
-    o.title + " " + o.summary + " " + (o.aiRationale ?? "") + " " + o.niche + " " + o.opportunityType
+    o.title +
+    " " +
+    o.summary +
+    " " +
+    (o.aiRationale ?? "") +
+    " " +
+    o.niche +
+    " " +
+    o.opportunityType
   ).toLowerCase();
   return keywords.filter((k) => haystack.includes(k.toLowerCase()));
 }

@@ -20,58 +20,124 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "viewer"]);
 
 export const nicheEnum = pgEnum("niche", [
   // Productivity Templates
-  "notion_template", "excel_template", "google_sheets_template",
-  "airtable_template", "powerpoint_template", "google_slides_template",
-  "clickup_template", "trello_template",
+  "notion_template",
+  "excel_template",
+  "google_sheets_template",
+  "airtable_template",
+  "powerpoint_template",
+  "google_slides_template",
+  "clickup_template",
+  "trello_template",
   // Printables
-  "etsy_printable", "wedding_printable", "party_printable",
-  "holiday_printable", "kids_activity_printable", "homeschool_printable",
-  "coloring_page", "sticker_sheet",
+  "etsy_printable",
+  "wedding_printable",
+  "party_printable",
+  "holiday_printable",
+  "kids_activity_printable",
+  "homeschool_printable",
+  "coloring_page",
+  "sticker_sheet",
   // Planners & Trackers
-  "planner_printable", "budget_tracker", "habit_tracker",
-  "meal_planner", "fitness_planner", "travel_planner",
-  "content_calendar", "project_planner",
+  "planner_printable",
+  "budget_tracker",
+  "habit_tracker",
+  "meal_planner",
+  "fitness_planner",
+  "travel_planner",
+  "content_calendar",
+  "project_planner",
   // Business Templates
-  "resume_template", "business_plan_template", "pitch_deck_template",
-  "invoice_template", "contract_template", "sop_template",
-  "business_card_template", "email_template",
+  "resume_template",
+  "business_plan_template",
+  "pitch_deck_template",
+  "invoice_template",
+  "contract_template",
+  "sop_template",
+  "business_card_template",
+  "email_template",
   // Marketing
-  "social_media_template", "instagram_template", "canva_template",
-  "youtube_thumbnail", "tiktok_template", "newsletter_template",
-  "brand_kit", "logo_template",
+  "social_media_template",
+  "instagram_template",
+  "canva_template",
+  "youtube_thumbnail",
+  "tiktok_template",
+  "newsletter_template",
+  "brand_kit",
+  "logo_template",
   // Design Assets
-  "figma_kit", "procreate_brush", "photoshop_action", "lightroom_preset",
-  "illustration_pack", "icon_pack", "mockup_template",
-  "font_bundle", "color_palette", "svg_cut_file",
+  "figma_kit",
+  "procreate_brush",
+  "photoshop_action",
+  "lightroom_preset",
+  "illustration_pack",
+  "icon_pack",
+  "mockup_template",
+  "font_bundle",
+  "color_palette",
+  "svg_cut_file",
   // Print on Demand
-  "print_on_demand", "sublimation_design", "embroidery_design",
-  "clipart_pack", "pattern_design",
+  "print_on_demand",
+  "sublimation_design",
+  "embroidery_design",
+  "clipart_pack",
+  "pattern_design",
   // Music & Audio
-  "sample_pack", "midi_pack", "drum_kit",
-  "sound_effect_pack", "music_loop_pack",
+  "sample_pack",
+  "midi_pack",
+  "drum_kit",
+  "sound_effect_pack",
+  "music_loop_pack",
   // Video
-  "video_template", "video_lut", "motion_graphic",
-  "youtube_banner", "intro_template",
+  "video_template",
+  "video_lut",
+  "motion_graphic",
+  "youtube_banner",
+  "intro_template",
   // Education & Info
-  "gumroad_ebook", "mini_course", "workbook", "swipe_file",
-  "checklist_pack", "study_guide", "flashcard_pack", "language_learning",
+  "gumroad_ebook",
+  "mini_course",
+  "workbook",
+  "swipe_file",
+  "checklist_pack",
+  "study_guide",
+  "flashcard_pack",
+  "language_learning",
   // Books & Publishing
-  "kdp_low_content", "journal_template", "planner_book",
+  "kdp_low_content",
+  "journal_template",
+  "planner_book",
   // AI Tools
-  "ai_prompt_pack", "chatgpt_prompt_pack", "midjourney_prompt_pack",
+  "ai_prompt_pack",
+  "chatgpt_prompt_pack",
+  "midjourney_prompt_pack",
   "ai_workflow_template",
   // Tech & Dev
-  "wordpress_theme", "shopify_app", "browser_extension", "discord_bot",
-  "micro_saas", "game_asset", "unity_asset", "website_template",
+  "wordpress_theme",
+  "shopify_app",
+  "browser_extension",
+  "discord_bot",
+  "micro_saas",
+  "game_asset",
+  "unity_asset",
+  "website_template",
   // Data & Finance
-  "dataset", "financial_model", "crm_template",
+  "dataset",
+  "financial_model",
+  "crm_template",
   // PLR Content
-  "plr_pack", "plr_articles", "plr_social_posts",
+  "plr_pack",
+  "plr_articles",
+  "plr_social_posts",
   // Lifestyle
-  "recipe_collection", "wedding_planner_kit", "event_planner_kit",
-  "kids_worksheet", "educational_poster", "goal_setting_workbook",
+  "recipe_collection",
+  "wedding_planner_kit",
+  "event_planner_kit",
+  "kids_worksheet",
+  "educational_poster",
+  "goal_setting_workbook",
   // Legacy / catch-all
-  "course", "other",
+  "course",
+  "other",
 ]);
 
 export const productStatusEnum = pgEnum("product_status", [
@@ -152,7 +218,12 @@ export const sourcePlatformEnum = pgEnum("source_platform", [
   "custom",
 ]);
 
-export const digestCadenceEnum = pgEnum("digest_cadence", ["daily", "weekly", "monthly", "on_demand"]);
+export const digestCadenceEnum = pgEnum("digest_cadence", [
+  "daily",
+  "weekly",
+  "monthly",
+  "on_demand",
+]);
 
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system", "tool"]);
 
@@ -237,7 +308,10 @@ export const products = pgTable(
     estMonthlyRevenueLow: real("est_monthly_revenue_low"),
     estMonthlyRevenueHigh: real("est_monthly_revenue_high"),
     niche: nicheEnum("niche").notNull(),
-    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
     thumbnailUrl: text("thumbnail_url"),
     rawJson: jsonb("raw_json"),
     embedding: vector("embedding", { dimensions: 1536 }),
@@ -263,7 +337,10 @@ export const creators = pgTable(
     followerCount: integer("follower_count"),
     productCount: integer("product_count").notNull().default(0),
     totalEstRevenueUsd: real("total_est_revenue_usd").notNull().default(0),
-    niches: text("niches").array().notNull().default(sql`ARRAY[]::text[]`),
+    niches: text("niches")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
     notes: text("notes"),
     playbook: jsonb("playbook"),
     lastEnrichedAt: timestamp("last_enriched_at", { withTimezone: true }).defaultNow().notNull(),
@@ -287,7 +364,10 @@ export const signals = pgTable(
     engagement: jsonb("engagement").notNull(),
     score: real("score").notNull().default(0),
     processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
-    ideaIdsLinked: text("idea_ids_linked").array().notNull().default(sql`ARRAY[]::text[]`),
+    ideaIdsLinked: text("idea_ids_linked")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
   },
   (t) => ({
     sourceIdIdx: uniqueIndex("signals_source_idx").on(t.sourcePlatform, t.sourceId),
@@ -327,8 +407,14 @@ export const opportunities = pgTable(
     buildEffort: buildEffortEnum("build_effort").notNull(),
     projectedRevenueUsd: real("projected_revenue_usd").notNull().default(0),
     status: productStatusEnum("status").notNull().default("tracking"),
-    sourceProductIds: text("source_product_ids").array().notNull().default(sql`ARRAY[]::text[]`),
-    sourceSignalIds: text("source_signal_ids").array().notNull().default(sql`ARRAY[]::text[]`),
+    sourceProductIds: text("source_product_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    sourceSignalIds: text("source_signal_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
     aiRationale: text("ai_rationale").notNull(),
     aiBuildPlan: jsonb("ai_build_plan").notNull(),
     score: real("score").notNull().default(0),
@@ -369,7 +455,10 @@ export const goldenRules = pgTable("golden_rules", {
   description: text("description").notNull(),
   ruleType: ruleTypeEnum("rule_type").notNull(),
   niche: nicheEnum("niche"),
-  keywords: text("keywords").array().notNull().default(sql`ARRAY[]::text[]`),
+  keywords: text("keywords")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
   weight: real("weight").notNull().default(0.5),
   active: boolean("active").notNull().default(true),
   createdBy: text("created_by").notNull(),
@@ -382,7 +471,10 @@ export const feedbackPatterns = pgTable("feedback_patterns", {
   description: text("description").notNull(),
   derivedFrom: text("derived_from").notNull(),
   confidence: real("confidence").notNull().default(0.5),
-  signalKeywords: text("signal_keywords").array().notNull().default(sql`ARRAY[]::text[]`),
+  signalKeywords: text("signal_keywords")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
   niche: nicheEnum("niche"),
   weight: real("weight").notNull().default(0.5),
   lastConfirmedAt: timestamp("last_confirmed_at", { withTimezone: true }).defaultNow().notNull(),
@@ -492,11 +584,20 @@ export const digests = pgTable("digests", {
   cadence: digestCadenceEnum("cadence").notNull(),
   periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
   periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-  topOpportunityIds: text("top_opportunity_ids").array().notNull().default(sql`ARRAY[]::text[]`),
-  risingNiches: text("rising_niches").array().notNull().default(sql`ARRAY[]::text[]`),
+  topOpportunityIds: text("top_opportunity_ids")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  risingNiches: text("rising_niches")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
   topProducts: jsonb("top_products").notNull(),
   aiSummary: text("ai_summary").notNull(),
-  sentTo: text("sent_to").array().notNull().default(sql`ARRAY[]::text[]`),
+  sentTo: text("sent_to")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

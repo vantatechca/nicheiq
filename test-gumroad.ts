@@ -3,8 +3,10 @@ import envato from "./src/lib/crawlers/envato";
 async function test() {
   console.log("Running Envato crawler...\n");
 
-  const raw     = await envato.crawl({ config: { site: "graphicriver.net", term: "template", sortBy: "trending" } });
-  const parsed  = envato.parse(raw);
+  const raw = await envato.crawl({
+    config: { site: "graphicriver.net", term: "template", sortBy: "trending" },
+  });
+  const parsed = envato.parse(raw);
   const signals = envato.normalize(parsed);
 
   console.log(`Signals found: ${signals.length}\n`);

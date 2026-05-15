@@ -12,10 +12,7 @@ export async function GET(_req: NextRequest) {
   // Phase F will derive these dynamically from vote/save/build patterns.
   // For now: surface feedback_patterns ordered by AI-confidence desc.
   const db = getDb();
-  const rows = await db
-    .select()
-    .from(feedbackPatterns)
-    .orderBy(desc(feedbackPatterns.confidence));
+  const rows = await db.select().from(feedbackPatterns).orderBy(desc(feedbackPatterns.confidence));
 
   return ok({ suggestions: rows });
 }

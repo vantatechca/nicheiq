@@ -135,7 +135,9 @@ export default function NicheDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {opps.length === 0 && (
-              <div className="text-xs text-slate-500">No opportunities tracked in this niche yet.</div>
+              <div className="text-xs text-slate-500">
+                No opportunities tracked in this niche yet.
+              </div>
             )}
             {opps.map((o) => (
               <Link
@@ -146,12 +148,16 @@ export default function NicheDetailPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <ScoreBadge score={o.score} size="sm" />
-                    <span className="text-[10px] uppercase text-slate-500">{o.opportunityType.replace(/_/g, " ")}</span>
+                    <span className="text-[10px] uppercase text-slate-500">
+                      {o.opportunityType.replace(/_/g, " ")}
+                    </span>
                   </div>
                   <div className="mt-1 line-clamp-1 text-sm font-medium">{o.title}</div>
                 </div>
                 <div className="text-right text-xs text-slate-400">
-                  <div className="text-emerald-400">{formatUsd(o.projectedRevenueUsd, { compact: true })}</div>
+                  <div className="text-emerald-400">
+                    {formatUsd(o.projectedRevenueUsd, { compact: true })}
+                  </div>
                 </div>
               </Link>
             ))}
@@ -168,12 +174,18 @@ export default function NicheDetailPage() {
               <div key={t.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span>{t.keyword}</span>
-                  <Badge variant="info" className="text-[10px] font-mono">
+                  <Badge variant="info" className="font-mono text-[10px]">
                     {t.momentumScore}
                   </Badge>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs">
-                  <Sparkline data={t.series} width={120} height={28} color="hsl(var(--primary))" className="text-primary" />
+                  <Sparkline
+                    data={t.series}
+                    width={120}
+                    height={28}
+                    color="hsl(var(--primary))"
+                    className="text-primary"
+                  />
                   <span className={t.growthPct >= 0 ? "text-emerald-400" : "text-rose-400"}>
                     {formatPct(t.growthPct, { signed: true })}
                   </span>
@@ -194,7 +206,11 @@ export default function NicheDetailPage() {
               <div className="text-xs text-slate-500">No products in this niche yet.</div>
             )}
             {productsTop.map((p) => (
-              <Link key={p.id} href={`/products/${p.id}`} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900">
+              <Link
+                key={p.id}
+                href={`/products/${p.id}`}
+                className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900"
+              >
                 <div className="line-clamp-1 text-sm font-medium">{p.title}</div>
                 <div className="text-xs text-slate-500">
                   {p.creator} · {formatUsd(p.priceUsd ?? 0)}
@@ -213,9 +229,14 @@ export default function NicheDetailPage() {
               <div className="text-xs text-slate-500">No recent signals.</div>
             )}
             {signalsTop.map((s) => (
-              <div key={s.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-xs">
+              <div
+                key={s.id}
+                className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-xs"
+              >
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-[10px]">{s.signalType.replace(/_/g, " ")}</Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {s.signalType.replace(/_/g, " ")}
+                  </Badge>
                   <span className="text-slate-500">{timeAgo(s.processedAt)}</span>
                 </div>
                 <div className="mt-1 font-medium text-slate-200">{s.title}</div>

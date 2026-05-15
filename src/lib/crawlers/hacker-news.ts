@@ -56,7 +56,11 @@ const hackerNews: CrawlerModule = {
       title: it.title,
       snippet: it.text?.slice(0, 280),
       capturedAt: new Date(it.time * 1000).toISOString(),
-      creator: { handle: it.by, displayName: it.by, profileUrl: `https://news.ycombinator.com/user?id=${it.by}` },
+      creator: {
+        handle: it.by,
+        displayName: it.by,
+        profileUrl: `https://news.ycombinator.com/user?id=${it.by}`,
+      },
       rawJson: it as unknown as Record<string, unknown>,
     }));
   },

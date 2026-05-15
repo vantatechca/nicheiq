@@ -1,6 +1,5 @@
 import type { CrawlerModule, RawSignal } from "./types";
 
-
 const ETSY_API_BASE = "https://openapi.etsy.com/v3/application";
 
 const DEFAULT_KEYWORDS = [
@@ -44,8 +43,7 @@ const etsy: CrawlerModule = {
     const apiKey = process.env.ETSY_API_KEY;
     if (!apiKey) throw new Error("ETSY_API_KEY missing");
 
-    const keywords =
-      (config.keywords as string[] | undefined) ?? DEFAULT_KEYWORDS;
+    const keywords = (config.keywords as string[] | undefined) ?? DEFAULT_KEYWORDS;
     const limit = (config.limit as number | undefined) ?? 50;
 
     const pages = await Promise.all(
@@ -56,13 +54,10 @@ const etsy: CrawlerModule = {
           sort_on: "score",
           sort_order: "desc",
         });
-        const res = await fetch(
-          `${ETSY_API_BASE}/listings/active?${params}`,
-          {
-            headers: { "x-api-key": apiKey },
-            signal: AbortSignal.timeout(15_000),
-          },
-        );
+        const res = await fetch(`${ETSY_API_BASE}/listings/active?${params}`, {
+          headers: { "x-api-key": apiKey },
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!res.ok) return { keyword: kw, results: [] };
         const json = await res.json();
         return { keyword: kw, results: json.results ?? [] };
@@ -74,9 +69,7 @@ const etsy: CrawlerModule = {
 
   parse(raw: unknown) {
     const pages = raw as EtsyPage[];
-    return pages.flatMap((p) =>
-      p.results.map((r) => ({ ...r, _keyword: p.keyword })),
-    );
+    return pages.flatMap((p) => p.results.map((r) => ({ ...r, _keyword: p.keyword })));
   },
 
   normalize(parsed: unknown[]): RawSignal[] {
@@ -99,9 +92,7 @@ const etsy: CrawlerModule = {
         capturedAt: new Date(l.creation_timestamp * 1000).toISOString(),
         tags: (l.tags ?? []).slice(0, 12),
         thumbnailUrl: l.images?.[0]?.url_fullxfull,
-        creator: l.shop
-          ? { handle: l.shop.shop_name, profileUrl: l.shop.url }
-          : undefined,
+        creator: l.shop ? { handle: l.shop.shop_name, profileUrl: l.shop.url } : undefined,
         rawJson: l as unknown as Record<string, unknown>,
       });
     }

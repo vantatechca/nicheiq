@@ -27,9 +27,7 @@ export async function GET(_req: NextRequest) {
   );
 
   // Average score across all opportunities — single aggregate query.
-  const [avgRow] = await db
-    .select({ avg: avg(opportunities.score) })
-    .from(opportunities);
+  const [avgRow] = await db.select({ avg: avg(opportunities.score) }).from(opportunities);
   const avgScore = avgRow?.avg ? Math.round(Number(avgRow.avg) * 10) / 10 : 0;
 
   // 14-day sparkline of opportunity score averages by created_at day.

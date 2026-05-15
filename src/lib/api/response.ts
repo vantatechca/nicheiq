@@ -25,7 +25,10 @@ export function serverError(error: string) {
   return NextResponse.json({ data: null, error }, { status: 500 });
 }
 
-export async function parseJson<T extends z.ZodTypeAny>(request: Request, schema: T): Promise<z.infer<T>> {
+export async function parseJson<T extends z.ZodTypeAny>(
+  request: Request,
+  schema: T,
+): Promise<z.infer<T>> {
   const raw = await request.json();
   return schema.parse(raw);
 }

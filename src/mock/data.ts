@@ -32,8 +32,10 @@ function det(seed: number) {
   const x = Math.sin(seed * 9301 + 49297) * 233280;
   return x - Math.floor(x);
 }
-const pick = <T>(arr: readonly T[], seed: number): T => arr[Math.floor(det(seed) * arr.length) % arr.length] as T;
-const randInt = (seed: number, min: number, max: number) => Math.floor(det(seed) * (max - min + 1)) + min;
+const pick = <T>(arr: readonly T[], seed: number): T =>
+  arr[Math.floor(det(seed) * arr.length) % arr.length] as T;
+const randInt = (seed: number, min: number, max: number) =>
+  Math.floor(det(seed) * (max - min + 1)) + min;
 const randFloat = (seed: number, min: number, max: number) => det(seed) * (max - min) + min;
 
 // ----------------------------- Users -----------------------------
@@ -82,26 +84,71 @@ export type MockUser = (typeof mockUsers)[number];
 // ----------------------------- Niches -----------------------------
 
 const nicheDescriptions: Record<NicheValue, { description: string; iconKey: string }> = {
-  print_on_demand: { description: "T-shirts, mugs, posters fulfilled by Printful/Printify networks.", iconKey: "shirt" },
-  etsy_printable: { description: "Instant-download printables sold on Etsy: planners, art, invites.", iconKey: "printer" },
-  notion_template: { description: "Productivity, OS, and CRM templates for Notion.", iconKey: "notion" },
+  print_on_demand: {
+    description: "T-shirts, mugs, posters fulfilled by Printful/Printify networks.",
+    iconKey: "shirt",
+  },
+  etsy_printable: {
+    description: "Instant-download printables sold on Etsy: planners, art, invites.",
+    iconKey: "printer",
+  },
+  notion_template: {
+    description: "Productivity, OS, and CRM templates for Notion.",
+    iconKey: "notion",
+  },
   gumroad_ebook: { description: "Self-published ebooks distributed via Gumroad.", iconKey: "book" },
-  kdp_low_content: { description: "Low-content books on KDP: journals, planners, notebooks.", iconKey: "notebook" },
+  kdp_low_content: {
+    description: "Low-content books on KDP: journals, planners, notebooks.",
+    iconKey: "notebook",
+  },
   course: { description: "Recorded video courses and cohort programs.", iconKey: "graduation-cap" },
-  ai_prompt_pack: { description: "Curated prompts for ChatGPT/Claude/Midjourney workflows.", iconKey: "sparkles" },
+  ai_prompt_pack: {
+    description: "Curated prompts for ChatGPT/Claude/Midjourney workflows.",
+    iconKey: "sparkles",
+  },
   figma_kit: { description: "Figma component libraries and UI kits.", iconKey: "figma" },
-  wordpress_theme: { description: "Premium WordPress themes and Gutenberg blocks.", iconKey: "wordpress" },
+  wordpress_theme: {
+    description: "Premium WordPress themes and Gutenberg blocks.",
+    iconKey: "wordpress",
+  },
   shopify_app: { description: "Shopify apps and embedded extensions.", iconKey: "store" },
-  lightroom_preset: { description: "Lightroom and mobile photo presets sold as packs.", iconKey: "camera" },
-  sample_pack: { description: "Audio sample packs, drum kits, MIDI loops for producers.", iconKey: "music" },
-  video_template: { description: "After Effects, Premiere, DaVinci motion templates.", iconKey: "film" },
-  dataset: { description: "Cleaned datasets ready for analysis or ML training.", iconKey: "database" },
-  plr_pack: { description: "Private-label rights bundles you can rebrand and resell.", iconKey: "package" },
+  lightroom_preset: {
+    description: "Lightroom and mobile photo presets sold as packs.",
+    iconKey: "camera",
+  },
+  sample_pack: {
+    description: "Audio sample packs, drum kits, MIDI loops for producers.",
+    iconKey: "music",
+  },
+  video_template: {
+    description: "After Effects, Premiere, DaVinci motion templates.",
+    iconKey: "film",
+  },
+  dataset: {
+    description: "Cleaned datasets ready for analysis or ML training.",
+    iconKey: "database",
+  },
+  plr_pack: {
+    description: "Private-label rights bundles you can rebrand and resell.",
+    iconKey: "package",
+  },
   micro_saas: { description: "Single-purpose SaaS tools under $50 ARR per user.", iconKey: "zap" },
-  browser_extension: { description: "Chrome/Firefox extensions sold as productivity boosters.", iconKey: "puzzle" },
-  discord_bot: { description: "Discord bots monetized via paid tiers or installs.", iconKey: "bot" },
-  game_asset: { description: "2D sprites, 3D models, sound effects for game devs.", iconKey: "joystick" },
-  other: { description: "Other digital opportunities outside the named niches.", iconKey: "more-horizontal" },
+  browser_extension: {
+    description: "Chrome/Firefox extensions sold as productivity boosters.",
+    iconKey: "puzzle",
+  },
+  discord_bot: {
+    description: "Discord bots monetized via paid tiers or installs.",
+    iconKey: "bot",
+  },
+  game_asset: {
+    description: "2D sprites, 3D models, sound effects for game devs.",
+    iconKey: "joystick",
+  },
+  other: {
+    description: "Other digital opportunities outside the named niches.",
+    iconKey: "more-horizontal",
+  },
 };
 
 export const mockNiches: Niche[] = NICHE_LIST.map((n, i) => ({
@@ -187,7 +234,12 @@ function buildPlaybook(seed: number): CreatorPlaybook {
       { label: "All-access", priceUsd: Math.round((59 + det(seed + 2) * 80) * 100) / 100 },
     ],
     postingCadence: pick(
-      ["3 listings/week", "Weekly drop + monthly bundle", "Daily TikTok + weekly listing", "Bi-weekly bundle release"],
+      [
+        "3 listings/week",
+        "Weekly drop + monthly bundle",
+        "Daily TikTok + weekly listing",
+        "Bi-weekly bundle release",
+      ],
       seed,
     ),
     topTags: pick(
@@ -409,26 +461,146 @@ const productTitlesByNiche: Record<NicheValue, string[]> = {
 };
 
 const tagsByNiche: Record<NicheValue, string[][]> = {
-  etsy_printable: [["minimalist", "boho", "neutral"], ["wedding", "elegant"], ["kids", "chore"], ["budget", "finance"], ["party", "games"]],
-  notion_template: [["productivity", "second-brain"], ["indie-hacker", "founder"], ["habit", "aesthetic"], ["content-calendar"], ["operating-system"]],
-  gumroad_ebook: [["mrr", "founder", "growth"], ["sales", "outreach"], ["launch", "indie"], ["acquisition", "boring-business"], ["studio", "agency"]],
-  kdp_low_content: [["journal", "lined"], ["pregnancy", "tracker"], ["mindful", "morning"], ["habit", "tracker"], ["faith", "christian"]],
-  course: [["etsy", "cohort"], ["notion", "self-paced"], ["pod", "print-on-demand"], ["ai", "side-hustle"], ["newsletter", "growth"]],
-  ai_prompt_pack: [["chatgpt", "marketing"], ["midjourney", "cinematic"], ["claude", "coding"], ["perplexity", "research"], ["agents", "n8n"]],
-  figma_kit: [["saas", "modern"], ["mobile", "auto-layout"], ["dashboards", "components"], ["brand", "templates"], ["wireframe", "atlas"]],
-  wordpress_theme: [["newsletter", "substack"], ["startup", "founder"], ["local", "business"], ["news", "magazine"], ["portfolio", "studio"]],
-  shopify_app: [["reorder", "ecommerce"], ["bundle", "checkout"], ["customs", "international"], ["loyalty", "rewards"], ["returns", "portal"]],
-  lightroom_preset: [["cinematic", "travel"], ["moody", "wedding"], ["foodie", "blogger"], ["boudoir", "editorial"], ["boho", "lifestyle"]],
-  sample_pack: [["lofi", "hiphop"], ["hyperpop", "vocal"], ["phonk", "drift"], ["trap", "soul"], ["synthwave", "analog"]],
-  video_template: [["cinematic", "travel"], ["tiktok", "hooks"], ["real-estate", "ae"], ["youtube", "intro"], ["davinci", "luts"]],
-  dataset: [["finance", "sentiment"], ["etsy", "tracking"], ["reddit", "scrape"], ["web3", "tokens"], ["indie", "pricing"]],
-  plr_pack: [["wellness", "articles"], ["affiliate", "marketing"], ["finance", "email"], ["self-care", "workbook"], ["ai", "minicourse"]],
-  micro_saas: [["twitter", "scheduler"], ["seo", "snapshot"], ["invoice", "freelance"], ["screen", "async"], ["form", "forward"]],
-  browser_extension: [["tabs", "session"], ["prompts", "vault"], ["citation", "research"], ["etsy", "tracker"], ["twitter", "ux"]],
-  discord_bot: [["moderation", "onboarding"], ["giveaway"], ["tipping"], ["raid", "shield"], ["roles", "reaction"]],
-  game_asset: [["pixel", "sprite"], ["platformer", "bg"], ["unity", "scifi"], ["tileset", "cottagecore"], ["3d", "foliage"]],
-  print_on_demand: [["funny", "cat-mom"], ["mental-health"], ["christian", "faith"], ["teacher", "appreciation"], ["halloween", "pumpkin"]],
-  other: [["lead-magnet", "email"], ["resume", "modern"], ["dm", "outreach"], ["pitch", "investor"], ["crypto", "whitepaper"]],
+  etsy_printable: [
+    ["minimalist", "boho", "neutral"],
+    ["wedding", "elegant"],
+    ["kids", "chore"],
+    ["budget", "finance"],
+    ["party", "games"],
+  ],
+  notion_template: [
+    ["productivity", "second-brain"],
+    ["indie-hacker", "founder"],
+    ["habit", "aesthetic"],
+    ["content-calendar"],
+    ["operating-system"],
+  ],
+  gumroad_ebook: [
+    ["mrr", "founder", "growth"],
+    ["sales", "outreach"],
+    ["launch", "indie"],
+    ["acquisition", "boring-business"],
+    ["studio", "agency"],
+  ],
+  kdp_low_content: [
+    ["journal", "lined"],
+    ["pregnancy", "tracker"],
+    ["mindful", "morning"],
+    ["habit", "tracker"],
+    ["faith", "christian"],
+  ],
+  course: [
+    ["etsy", "cohort"],
+    ["notion", "self-paced"],
+    ["pod", "print-on-demand"],
+    ["ai", "side-hustle"],
+    ["newsletter", "growth"],
+  ],
+  ai_prompt_pack: [
+    ["chatgpt", "marketing"],
+    ["midjourney", "cinematic"],
+    ["claude", "coding"],
+    ["perplexity", "research"],
+    ["agents", "n8n"],
+  ],
+  figma_kit: [
+    ["saas", "modern"],
+    ["mobile", "auto-layout"],
+    ["dashboards", "components"],
+    ["brand", "templates"],
+    ["wireframe", "atlas"],
+  ],
+  wordpress_theme: [
+    ["newsletter", "substack"],
+    ["startup", "founder"],
+    ["local", "business"],
+    ["news", "magazine"],
+    ["portfolio", "studio"],
+  ],
+  shopify_app: [
+    ["reorder", "ecommerce"],
+    ["bundle", "checkout"],
+    ["customs", "international"],
+    ["loyalty", "rewards"],
+    ["returns", "portal"],
+  ],
+  lightroom_preset: [
+    ["cinematic", "travel"],
+    ["moody", "wedding"],
+    ["foodie", "blogger"],
+    ["boudoir", "editorial"],
+    ["boho", "lifestyle"],
+  ],
+  sample_pack: [
+    ["lofi", "hiphop"],
+    ["hyperpop", "vocal"],
+    ["phonk", "drift"],
+    ["trap", "soul"],
+    ["synthwave", "analog"],
+  ],
+  video_template: [
+    ["cinematic", "travel"],
+    ["tiktok", "hooks"],
+    ["real-estate", "ae"],
+    ["youtube", "intro"],
+    ["davinci", "luts"],
+  ],
+  dataset: [
+    ["finance", "sentiment"],
+    ["etsy", "tracking"],
+    ["reddit", "scrape"],
+    ["web3", "tokens"],
+    ["indie", "pricing"],
+  ],
+  plr_pack: [
+    ["wellness", "articles"],
+    ["affiliate", "marketing"],
+    ["finance", "email"],
+    ["self-care", "workbook"],
+    ["ai", "minicourse"],
+  ],
+  micro_saas: [
+    ["twitter", "scheduler"],
+    ["seo", "snapshot"],
+    ["invoice", "freelance"],
+    ["screen", "async"],
+    ["form", "forward"],
+  ],
+  browser_extension: [
+    ["tabs", "session"],
+    ["prompts", "vault"],
+    ["citation", "research"],
+    ["etsy", "tracker"],
+    ["twitter", "ux"],
+  ],
+  discord_bot: [
+    ["moderation", "onboarding"],
+    ["giveaway"],
+    ["tipping"],
+    ["raid", "shield"],
+    ["roles", "reaction"],
+  ],
+  game_asset: [
+    ["pixel", "sprite"],
+    ["platformer", "bg"],
+    ["unity", "scifi"],
+    ["tileset", "cottagecore"],
+    ["3d", "foliage"],
+  ],
+  print_on_demand: [
+    ["funny", "cat-mom"],
+    ["mental-health"],
+    ["christian", "faith"],
+    ["teacher", "appreciation"],
+    ["halloween", "pumpkin"],
+  ],
+  other: [
+    ["lead-magnet", "email"],
+    ["resume", "modern"],
+    ["dm", "outreach"],
+    ["pitch", "investor"],
+    ["crypto", "whitepaper"],
+  ],
 };
 
 const nicheValues = NICHE_LIST.map((n) => n.value);
@@ -505,7 +677,15 @@ const signalSnippets = [
 const signalSeed: Signal[] = [];
 for (let i = 0; i < 60; i++) {
   const niche = nicheValues[i % nicheValues.length] as NicheValue;
-  const platform = pick(platformList.concat(["reddit", "product_hunt", "indie_hackers", "google_trends"] as SourcePlatform[]), i + 91);
+  const platform = pick(
+    platformList.concat([
+      "reddit",
+      "product_hunt",
+      "indie_hackers",
+      "google_trends",
+    ] as SourcePlatform[]),
+    i + 91,
+  );
   const signalType = signalTypes[i % signalTypes.length]!;
   signalSeed.push({
     id: `signal_${i + 1}`,
@@ -593,8 +773,18 @@ const statuses = ["tracking", "shortlisted", "building", "launched", "abandoned"
 const buildPlanTemplates: Record<string, BuildPlan> = {
   weekend: {
     weeks: [
-      { label: "Day 1", deliverables: ["Lock in concept + 3 reference products", "Draft hero copy", "Create 5 design variants in Figma"] },
-      { label: "Day 2", deliverables: ["Finalize bundle", "Set up Gumroad listing", "Schedule launch tweet thread"] },
+      {
+        label: "Day 1",
+        deliverables: [
+          "Lock in concept + 3 reference products",
+          "Draft hero copy",
+          "Create 5 design variants in Figma",
+        ],
+      },
+      {
+        label: "Day 2",
+        deliverables: ["Finalize bundle", "Set up Gumroad listing", "Schedule launch tweet thread"],
+      },
     ],
     stack: ["Figma", "Gumroad", "Pinterest scheduler"],
     risks: ["Saturated keywords", "Trademark conflicts on POD designs"],
@@ -603,7 +793,14 @@ const buildPlanTemplates: Record<string, BuildPlan> = {
   },
   week: {
     weeks: [
-      { label: "Week 1", deliverables: ["Validate via TikTok demo", "Build v1 in Notion or Figma", "Recruit 3 beta buyers"] },
+      {
+        label: "Week 1",
+        deliverables: [
+          "Validate via TikTok demo",
+          "Build v1 in Notion or Figma",
+          "Recruit 3 beta buyers",
+        ],
+      },
     ],
     stack: ["Notion", "TikTok", "Stan Store"],
     risks: ["TikTok algo flips", "Low-margin churn"],
@@ -612,7 +809,10 @@ const buildPlanTemplates: Record<string, BuildPlan> = {
   },
   month: {
     weeks: [
-      { label: "Week 1", deliverables: ["Audience research + competitor teardown", "Define MVP scope"] },
+      {
+        label: "Week 1",
+        deliverables: ["Audience research + competitor teardown", "Define MVP scope"],
+      },
       { label: "Week 2", deliverables: ["Build core flow", "Internal QA"] },
       { label: "Week 3", deliverables: ["Closed beta with 20 users", "Iterate"] },
       { label: "Week 4", deliverables: ["Public launch on Product Hunt", "Post on r/SideProject"] },
@@ -678,9 +878,17 @@ function buildScoreBreakdown(score: number, seed: number): ScoreBreakdown {
   return {
     dimensions: {
       demand: { value: dims[0]!.value, weight: dims[0]!.weight, rationale: dims[0]!.rationale },
-      competition: { value: dims[1]!.value, weight: dims[1]!.weight, rationale: dims[1]!.rationale },
+      competition: {
+        value: dims[1]!.value,
+        weight: dims[1]!.weight,
+        rationale: dims[1]!.rationale,
+      },
       revenue: { value: dims[2]!.value, weight: dims[2]!.weight, rationale: dims[2]!.rationale },
-      buildEffort: { value: dims[3]!.value, weight: dims[3]!.weight, rationale: dims[3]!.rationale },
+      buildEffort: {
+        value: dims[3]!.value,
+        weight: dims[3]!.weight,
+        rationale: dims[3]!.rationale,
+      },
       trend: { value: dims[4]!.value, weight: dims[4]!.weight, rationale: dims[4]!.rationale },
     },
     ruleModifiers,
@@ -748,7 +956,12 @@ for (let i = 0; i < 30; i++) {
       2,
       7,
     )} trend signals. Competition pocket is shallow due to ${pick(
-      ["fragmented creator base", "lack of curated bundles", "no dominant brand", "stale top-rated assets"],
+      [
+        "fragmented creator base",
+        "lack of curated bundles",
+        "no dominant brand",
+        "stale top-rated assets",
+      ],
       i + 143,
     )}. Project's ROI breakeven at ~${randInt(i + 147, 18, 80)} sales.`,
     aiBuildPlan: buildPlanTemplates[buildEffort] as BuildPlan,
@@ -772,46 +985,369 @@ for (const niche of mockNiches) {
 // ----------------------------- Golden Rules -----------------------------
 
 export const mockGoldenRules: GoldenRule[] = [
-  { id: "rule_1", label: "Block: NSFW or explicit", description: "Never surface adult content.", ruleType: "block", niche: null, keywords: ["nsfw", "explicit", "adult"], weight: 1, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(120) },
-  { id: "rule_2", label: "Block: trademark heavy POD", description: "Skip Disney / sports teams etc.", ruleType: "block", niche: "print_on_demand", keywords: ["disney", "marvel", "nfl", "nba"], weight: 1, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(110) },
-  { id: "rule_3", label: "Boost: Notion-adjacent", description: "Notion templates have the user's domain edge.", ruleType: "boost", niche: "notion_template", keywords: ["notion", "second-brain", "operating-system"], weight: 0.7, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(85) },
-  { id: "rule_4", label: "Boost: weekend builds", description: "User's preferred cadence.", ruleType: "boost", niche: null, keywords: ["weekend", "fast-launch"], weight: 0.6, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(80) },
-  { id: "rule_5", label: "Penalize: physical fulfillment", description: "User wants pure digital.", ruleType: "penalize", niche: null, keywords: ["printful", "shipping", "warehouse"], weight: 0.7, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(70) },
-  { id: "rule_6", label: "Require: license clear", description: "Resellable assets must have explicit license.", ruleType: "require", niche: null, keywords: ["license", "rights"], weight: 0.9, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(65) },
-  { id: "rule_7", label: "Penalize: course farms", description: "Avoid generic Skillshare-style courses.", ruleType: "penalize", niche: "course", keywords: ["skillshare", "udemy-clone"], weight: 0.5, active: true, createdBy: "user_editor", createdAt: isoMinusDays(60) },
-  { id: "rule_8", label: "Boost: AI-leveraged", description: "Anything that uses AI as a moat.", ruleType: "boost", niche: null, keywords: ["ai", "claude", "gpt", "embedding"], weight: 0.8, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(55) },
-  { id: "rule_9", label: "Require: under $1k tooling", description: "Solo founder budget.", ruleType: "require", niche: null, keywords: ["solo", "indie"], weight: 0.4, active: false, createdBy: "user_andrei", createdAt: isoMinusDays(50) },
-  { id: "rule_10", label: "Penalize: discord-only audience", description: "Hard to attribute revenue.", ruleType: "penalize", niche: null, keywords: ["discord-only", "community-only"], weight: 0.4, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(45) },
-  { id: "rule_11", label: "Boost: recurring revenue", description: "Prefer SaaS / membership over one-off.", ruleType: "boost", niche: null, keywords: ["saas", "membership", "subscription"], weight: 0.7, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(40) },
-  { id: "rule_12", label: "Block: MLM-adjacent", description: "Never recommend MLM playbooks.", ruleType: "block", niche: null, keywords: ["mlm", "downline"], weight: 1, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(35) },
-  { id: "rule_13", label: "Penalize: requires headless scraping for production", description: "Higher legal/ops cost.", ruleType: "penalize", niche: null, keywords: ["headless", "puppeteer-prod"], weight: 0.4, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(30) },
-  { id: "rule_14", label: "Boost: vertical SaaS", description: "Underserved verticals win.", ruleType: "boost", niche: "micro_saas", keywords: ["vertical", "niche-saas"], weight: 0.65, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(25) },
-  { id: "rule_15", label: "Require: real demand evidence", description: "Need at least 2 demand signals.", ruleType: "require", niche: null, keywords: ["demand", "evidence"], weight: 0.7, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(20) },
-  { id: "rule_16", label: "Penalize: undifferentiated KDP", description: "Generic journals are saturated.", ruleType: "penalize", niche: "kdp_low_content", keywords: ["lined-journal", "blank-notebook"], weight: 0.5, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(18) },
-  { id: "rule_17", label: "Boost: Etsy + KDP combo", description: "Cross-platform packaging.", ruleType: "boost", niche: null, keywords: ["etsy", "kdp", "cross-platform"], weight: 0.6, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(14) },
-  { id: "rule_18", label: "Penalize: regulatory risk", description: "Health/finance claims need extra care.", ruleType: "penalize", niche: null, keywords: ["medical-advice", "investment-advice"], weight: 0.6, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(11) },
-  { id: "rule_19", label: "Boost: bundleable assets", description: "Easy to extend SKU count.", ruleType: "boost", niche: null, keywords: ["bundle", "pack", "extensible"], weight: 0.5, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(7) },
-  { id: "rule_20", label: "Block: PII data products", description: "No personal data resale.", ruleType: "block", niche: "dataset", keywords: ["pii", "personal-data", "email-leak"], weight: 1, active: true, createdBy: "user_andrei", createdAt: isoMinusDays(2) },
+  {
+    id: "rule_1",
+    label: "Block: NSFW or explicit",
+    description: "Never surface adult content.",
+    ruleType: "block",
+    niche: null,
+    keywords: ["nsfw", "explicit", "adult"],
+    weight: 1,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(120),
+  },
+  {
+    id: "rule_2",
+    label: "Block: trademark heavy POD",
+    description: "Skip Disney / sports teams etc.",
+    ruleType: "block",
+    niche: "print_on_demand",
+    keywords: ["disney", "marvel", "nfl", "nba"],
+    weight: 1,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(110),
+  },
+  {
+    id: "rule_3",
+    label: "Boost: Notion-adjacent",
+    description: "Notion templates have the user's domain edge.",
+    ruleType: "boost",
+    niche: "notion_template",
+    keywords: ["notion", "second-brain", "operating-system"],
+    weight: 0.7,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(85),
+  },
+  {
+    id: "rule_4",
+    label: "Boost: weekend builds",
+    description: "User's preferred cadence.",
+    ruleType: "boost",
+    niche: null,
+    keywords: ["weekend", "fast-launch"],
+    weight: 0.6,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(80),
+  },
+  {
+    id: "rule_5",
+    label: "Penalize: physical fulfillment",
+    description: "User wants pure digital.",
+    ruleType: "penalize",
+    niche: null,
+    keywords: ["printful", "shipping", "warehouse"],
+    weight: 0.7,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(70),
+  },
+  {
+    id: "rule_6",
+    label: "Require: license clear",
+    description: "Resellable assets must have explicit license.",
+    ruleType: "require",
+    niche: null,
+    keywords: ["license", "rights"],
+    weight: 0.9,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(65),
+  },
+  {
+    id: "rule_7",
+    label: "Penalize: course farms",
+    description: "Avoid generic Skillshare-style courses.",
+    ruleType: "penalize",
+    niche: "course",
+    keywords: ["skillshare", "udemy-clone"],
+    weight: 0.5,
+    active: true,
+    createdBy: "user_editor",
+    createdAt: isoMinusDays(60),
+  },
+  {
+    id: "rule_8",
+    label: "Boost: AI-leveraged",
+    description: "Anything that uses AI as a moat.",
+    ruleType: "boost",
+    niche: null,
+    keywords: ["ai", "claude", "gpt", "embedding"],
+    weight: 0.8,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(55),
+  },
+  {
+    id: "rule_9",
+    label: "Require: under $1k tooling",
+    description: "Solo founder budget.",
+    ruleType: "require",
+    niche: null,
+    keywords: ["solo", "indie"],
+    weight: 0.4,
+    active: false,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(50),
+  },
+  {
+    id: "rule_10",
+    label: "Penalize: discord-only audience",
+    description: "Hard to attribute revenue.",
+    ruleType: "penalize",
+    niche: null,
+    keywords: ["discord-only", "community-only"],
+    weight: 0.4,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(45),
+  },
+  {
+    id: "rule_11",
+    label: "Boost: recurring revenue",
+    description: "Prefer SaaS / membership over one-off.",
+    ruleType: "boost",
+    niche: null,
+    keywords: ["saas", "membership", "subscription"],
+    weight: 0.7,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(40),
+  },
+  {
+    id: "rule_12",
+    label: "Block: MLM-adjacent",
+    description: "Never recommend MLM playbooks.",
+    ruleType: "block",
+    niche: null,
+    keywords: ["mlm", "downline"],
+    weight: 1,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(35),
+  },
+  {
+    id: "rule_13",
+    label: "Penalize: requires headless scraping for production",
+    description: "Higher legal/ops cost.",
+    ruleType: "penalize",
+    niche: null,
+    keywords: ["headless", "puppeteer-prod"],
+    weight: 0.4,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(30),
+  },
+  {
+    id: "rule_14",
+    label: "Boost: vertical SaaS",
+    description: "Underserved verticals win.",
+    ruleType: "boost",
+    niche: "micro_saas",
+    keywords: ["vertical", "niche-saas"],
+    weight: 0.65,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(25),
+  },
+  {
+    id: "rule_15",
+    label: "Require: real demand evidence",
+    description: "Need at least 2 demand signals.",
+    ruleType: "require",
+    niche: null,
+    keywords: ["demand", "evidence"],
+    weight: 0.7,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(20),
+  },
+  {
+    id: "rule_16",
+    label: "Penalize: undifferentiated KDP",
+    description: "Generic journals are saturated.",
+    ruleType: "penalize",
+    niche: "kdp_low_content",
+    keywords: ["lined-journal", "blank-notebook"],
+    weight: 0.5,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(18),
+  },
+  {
+    id: "rule_17",
+    label: "Boost: Etsy + KDP combo",
+    description: "Cross-platform packaging.",
+    ruleType: "boost",
+    niche: null,
+    keywords: ["etsy", "kdp", "cross-platform"],
+    weight: 0.6,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(14),
+  },
+  {
+    id: "rule_18",
+    label: "Penalize: regulatory risk",
+    description: "Health/finance claims need extra care.",
+    ruleType: "penalize",
+    niche: null,
+    keywords: ["medical-advice", "investment-advice"],
+    weight: 0.6,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(11),
+  },
+  {
+    id: "rule_19",
+    label: "Boost: bundleable assets",
+    description: "Easy to extend SKU count.",
+    ruleType: "boost",
+    niche: null,
+    keywords: ["bundle", "pack", "extensible"],
+    weight: 0.5,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(7),
+  },
+  {
+    id: "rule_20",
+    label: "Block: PII data products",
+    description: "No personal data resale.",
+    ruleType: "block",
+    niche: "dataset",
+    keywords: ["pii", "personal-data", "email-leak"],
+    weight: 1,
+    active: true,
+    createdBy: "user_andrei",
+    createdAt: isoMinusDays(2),
+  },
 ];
 
 // ----------------------------- Feedback Patterns -----------------------------
 
 export const mockFeedbackPatterns: FeedbackPattern[] = [
-  { id: "pattern_1", label: "User upvotes Notion-related opportunities", description: "8 of last 10 upvotes were Notion-tagged.", derivedFrom: "votes", confidence: 0.86, signalKeywords: ["notion", "second-brain"], niche: "notion_template", weight: 0.7, lastConfirmedAt: isoMinusDays(1) },
-  { id: "pattern_2", label: "Saves under-$30 templates", description: "73% of saves are sub-$30 listings.", derivedFrom: "saves", confidence: 0.74, signalKeywords: ["under-30", "low-price"], niche: null, weight: 0.5, lastConfirmedAt: isoMinusDays(2) },
-  { id: "pattern_3", label: "Abandons multi-month builds", description: "User abandons opportunities tagged quarter+.", derivedFrom: "abandons", confidence: 0.81, signalKeywords: ["quarter", "year_plus"], niche: null, weight: 0.6, lastConfirmedAt: isoMinusDays(4) },
-  { id: "pattern_4", label: "Builds AI-leveraged ideas", description: "Last 3 builds were AI-tagged.", derivedFrom: "builds", confidence: 0.92, signalKeywords: ["ai", "agent", "embedding"], niche: null, weight: 0.7, lastConfirmedAt: isoMinusDays(0) },
-  { id: "pattern_5", label: "Skips physical fulfillment", description: "12 down-votes on POD/Printful items.", derivedFrom: "votes", confidence: 0.79, signalKeywords: ["printful", "shipping"], niche: "print_on_demand", weight: 0.6, lastConfirmedAt: isoMinusDays(5) },
-  { id: "pattern_6", label: "Likes weekend cadence", description: "8 of 12 saves are weekend-effort.", derivedFrom: "saves", confidence: 0.82, signalKeywords: ["weekend"], niche: null, weight: 0.7, lastConfirmedAt: isoMinusDays(3) },
-  { id: "pattern_7", label: "Prefers Etsy + KDP combos", description: "Cross-platform combos saved more.", derivedFrom: "saves", confidence: 0.69, signalKeywords: ["etsy", "kdp"], niche: null, weight: 0.4, lastConfirmedAt: isoMinusDays(6) },
-  { id: "pattern_8", label: "Down-votes Discord-only", description: "Voted down 5 Discord-bot ideas in a row.", derivedFrom: "votes", confidence: 0.7, signalKeywords: ["discord-only"], niche: "discord_bot", weight: 0.4, lastConfirmedAt: isoMinusDays(7) },
-  { id: "pattern_9", label: "Annotates dataset opportunities", description: "Adds notes to dataset/PLR opportunities.", derivedFrom: "saves", confidence: 0.66, signalKeywords: ["dataset", "plr"], niche: "dataset", weight: 0.4, lastConfirmedAt: isoMinusDays(8) },
-  { id: "pattern_10", label: "Builds with recurring monetization", description: "Picks SaaS/subscription monetization 4 of 5 times.", derivedFrom: "builds", confidence: 0.78, signalKeywords: ["saas", "subscription", "membership"], niche: null, weight: 0.6, lastConfirmedAt: isoMinusDays(0) },
+  {
+    id: "pattern_1",
+    label: "User upvotes Notion-related opportunities",
+    description: "8 of last 10 upvotes were Notion-tagged.",
+    derivedFrom: "votes",
+    confidence: 0.86,
+    signalKeywords: ["notion", "second-brain"],
+    niche: "notion_template",
+    weight: 0.7,
+    lastConfirmedAt: isoMinusDays(1),
+  },
+  {
+    id: "pattern_2",
+    label: "Saves under-$30 templates",
+    description: "73% of saves are sub-$30 listings.",
+    derivedFrom: "saves",
+    confidence: 0.74,
+    signalKeywords: ["under-30", "low-price"],
+    niche: null,
+    weight: 0.5,
+    lastConfirmedAt: isoMinusDays(2),
+  },
+  {
+    id: "pattern_3",
+    label: "Abandons multi-month builds",
+    description: "User abandons opportunities tagged quarter+.",
+    derivedFrom: "abandons",
+    confidence: 0.81,
+    signalKeywords: ["quarter", "year_plus"],
+    niche: null,
+    weight: 0.6,
+    lastConfirmedAt: isoMinusDays(4),
+  },
+  {
+    id: "pattern_4",
+    label: "Builds AI-leveraged ideas",
+    description: "Last 3 builds were AI-tagged.",
+    derivedFrom: "builds",
+    confidence: 0.92,
+    signalKeywords: ["ai", "agent", "embedding"],
+    niche: null,
+    weight: 0.7,
+    lastConfirmedAt: isoMinusDays(0),
+  },
+  {
+    id: "pattern_5",
+    label: "Skips physical fulfillment",
+    description: "12 down-votes on POD/Printful items.",
+    derivedFrom: "votes",
+    confidence: 0.79,
+    signalKeywords: ["printful", "shipping"],
+    niche: "print_on_demand",
+    weight: 0.6,
+    lastConfirmedAt: isoMinusDays(5),
+  },
+  {
+    id: "pattern_6",
+    label: "Likes weekend cadence",
+    description: "8 of 12 saves are weekend-effort.",
+    derivedFrom: "saves",
+    confidence: 0.82,
+    signalKeywords: ["weekend"],
+    niche: null,
+    weight: 0.7,
+    lastConfirmedAt: isoMinusDays(3),
+  },
+  {
+    id: "pattern_7",
+    label: "Prefers Etsy + KDP combos",
+    description: "Cross-platform combos saved more.",
+    derivedFrom: "saves",
+    confidence: 0.69,
+    signalKeywords: ["etsy", "kdp"],
+    niche: null,
+    weight: 0.4,
+    lastConfirmedAt: isoMinusDays(6),
+  },
+  {
+    id: "pattern_8",
+    label: "Down-votes Discord-only",
+    description: "Voted down 5 Discord-bot ideas in a row.",
+    derivedFrom: "votes",
+    confidence: 0.7,
+    signalKeywords: ["discord-only"],
+    niche: "discord_bot",
+    weight: 0.4,
+    lastConfirmedAt: isoMinusDays(7),
+  },
+  {
+    id: "pattern_9",
+    label: "Annotates dataset opportunities",
+    description: "Adds notes to dataset/PLR opportunities.",
+    derivedFrom: "saves",
+    confidence: 0.66,
+    signalKeywords: ["dataset", "plr"],
+    niche: "dataset",
+    weight: 0.4,
+    lastConfirmedAt: isoMinusDays(8),
+  },
+  {
+    id: "pattern_10",
+    label: "Builds with recurring monetization",
+    description: "Picks SaaS/subscription monetization 4 of 5 times.",
+    derivedFrom: "builds",
+    confidence: 0.78,
+    signalKeywords: ["saas", "subscription", "membership"],
+    niche: null,
+    weight: 0.6,
+    lastConfirmedAt: isoMinusDays(0),
+  },
 ];
 
 // ----------------------------- Sources -----------------------------
 
-const sourceLabels: Record<SourcePlatform, { label: string; cron: string; requiresHeadless?: boolean }> = {
+const sourceLabels: Record<
+  SourcePlatform,
+  { label: string; cron: string; requiresHeadless?: boolean }
+> = {
   etsy: { label: "Etsy digital downloads", cron: "0 */6 * * *", requiresHeadless: true },
   gumroad: { label: "Gumroad Discover", cron: "0 */4 * * *", requiresHeadless: true },
   creative_market: { label: "Creative Market", cron: "0 */8 * * *", requiresHeadless: true },
@@ -828,7 +1364,11 @@ const sourceLabels: Record<SourcePlatform, { label: string; cron: string; requir
   lemonsqueezy: { label: "Lemon Squeezy storefronts", cron: "0 */6 * * *", requiresHeadless: true },
   patreon: { label: "Patreon Most Popular", cron: "0 */12 * * *", requiresHeadless: true },
   skool: { label: "Skool top communities", cron: "0 */12 * * *", requiresHeadless: true },
-  teachers_pay_teachers: { label: "Teachers Pay Teachers", cron: "0 */12 * * *", requiresHeadless: true },
+  teachers_pay_teachers: {
+    label: "Teachers Pay Teachers",
+    cron: "0 */12 * * *",
+    requiresHeadless: true,
+  },
   google_trends: { label: "Google Trends (SerpAPI)", cron: "0 0 * * *" },
   tiktok: { label: "TikTok Creative Center", cron: "0 */6 * * *" },
   pinterest: { label: "Pinterest Trends", cron: "0 0 * * *" },
@@ -851,19 +1391,24 @@ const sourceLabels: Record<SourcePlatform, { label: string; cron: string; requir
   custom: { label: "Custom source", cron: "0 0 * * *" },
 };
 
-export const mockSources: Source[] = (Object.keys(sourceLabels) as SourcePlatform[]).map((platform, i) => ({
-  id: `source_${platform}`,
-  sourcePlatform: platform,
-  label: sourceLabels[platform].label,
-  config: { regions: ["US", "Worldwide"], minRating: 4.2 },
-  enabled: i % 5 !== 4,
-  cronSchedule: sourceLabels[platform].cron,
-  lastRunAt: isoMinusHours(randInt(i + 173, 0, 96)),
-  lastRunStatus: pick(["ok", "ok", "ok", "error", "running", "idle"], i + 179) as Source["lastRunStatus"],
-  lastError: i % 8 === 7 ? "Cloudflare 403 — needs proxy rotation." : null,
-  itemsTracked: randInt(i + 181, 12, 5400),
-  requiresHeadless: !!sourceLabels[platform].requiresHeadless,
-}));
+export const mockSources: Source[] = (Object.keys(sourceLabels) as SourcePlatform[]).map(
+  (platform, i) => ({
+    id: `source_${platform}`,
+    sourcePlatform: platform,
+    label: sourceLabels[platform].label,
+    config: { regions: ["US", "Worldwide"], minRating: 4.2 },
+    enabled: i % 5 !== 4,
+    cronSchedule: sourceLabels[platform].cron,
+    lastRunAt: isoMinusHours(randInt(i + 173, 0, 96)),
+    lastRunStatus: pick(
+      ["ok", "ok", "ok", "error", "running", "idle"],
+      i + 179,
+    ) as Source["lastRunStatus"],
+    lastError: i % 8 === 7 ? "Cloudflare 403 — needs proxy rotation." : null,
+    itemsTracked: randInt(i + 181, 12, 5400),
+    requiresHeadless: !!sourceLabels[platform].requiresHeadless,
+  }),
+);
 
 // ----------------------------- Competitors -----------------------------
 
@@ -920,7 +1465,9 @@ digestSeed.push({
   periodEnd: isoMinusDays(0),
   topOpportunityIds: mockOpportunities.slice(0, 5).map((o) => o.id),
   risingNiches: ["notion_template", "ai_prompt_pack", "etsy_printable"],
-  topProducts: mockProducts.slice(0, 6).map((p) => ({ id: p.id, title: p.title, revenue: p.estMonthlyRevenueHigh ?? 0 })),
+  topProducts: mockProducts
+    .slice(0, 6)
+    .map((p) => ({ id: p.id, title: p.title, revenue: p.estMonthlyRevenueHigh ?? 0 })),
   aiSummary:
     "Weekly digest: AI prompt packs and Notion second-brain templates dominated this week. Five new dataset drops on Kaggle qualify for a repackage play.",
   sentTo: ["andrei@nicheiq.com", "editor@nicheiq.com"],
@@ -931,18 +1478,174 @@ export const mockDigests = digestSeed;
 // ----------------------------- Resellable Assets -----------------------------
 
 export const mockResellable: ResellableAsset[] = [
-  { id: "asset_1", sourcePlatform: "kaggle", sourceUrl: "https://kaggle.com/datasets/jcsmnz/etsy-top-100", assetType: "dataset", title: "Etsy Top-100 Daily Snapshot 2024-2025", askingPriceUsd: null, monthlyRevenueUsd: null, license: "MIT", niche: "etsy_printable", notes: "Wraps perfectly into a $9/mo trend tracker.", status: "reviewing", createdAt: isoMinusDays(2) },
-  { id: "asset_2", sourcePlatform: "plr_marketplace", sourceUrl: "https://plr.me/wellness-articles-50", assetType: "plr_pack", title: "PLR — 50 Wellness Articles Pack", askingPriceUsd: 47, monthlyRevenueUsd: null, license: "Resell rights, no master rights.", niche: "plr_pack", notes: "Refresh hooks and bundle as ebook.", status: "new", createdAt: isoMinusDays(5) },
-  { id: "asset_3", sourcePlatform: "flippa", sourceUrl: "https://flippa.com/12345-etsy-shop", assetType: "expired_etsy", title: "Etsy Shop — Boho Wedding Printables", askingPriceUsd: 1800, monthlyRevenueUsd: 320, license: null, niche: "etsy_printable", notes: "Owner motivated; shop has 2k followers.", status: "negotiating", createdAt: isoMinusDays(3) },
-  { id: "asset_4", sourcePlatform: "micro_acquire", sourceUrl: "https://acquire.com/listing/abc", assetType: "microacquire_listing", title: "Micro-SaaS — Twitter Schedule Tool", askingPriceUsd: 8500, monthlyRevenueUsd: 480, license: "Full IP transfer.", niche: "micro_saas", notes: "Tech debt acceptable; $480 MRR.", status: "reviewing", createdAt: isoMinusDays(8) },
-  { id: "asset_5", sourcePlatform: "kaggle", sourceUrl: "https://kaggle.com/datasets/reddit-entrepreneur", assetType: "dataset", title: "Reddit r/entrepreneur Submissions Dataset", askingPriceUsd: null, monthlyRevenueUsd: null, license: "CC-BY 4.0", niche: "dataset", notes: "Slice into a daily trend digest.", status: "new", createdAt: isoMinusDays(1) },
-  { id: "asset_6", sourcePlatform: "flippa", sourceUrl: "https://flippa.com/expired-domain-aestheticfinance", assetType: "expired_domain", title: "aestheticfinance.com — expired", askingPriceUsd: 220, monthlyRevenueUsd: null, license: null, niche: "etsy_printable", notes: "Brand fits the 'aesthetic finance' trend.", status: "passed", createdAt: isoMinusDays(10) },
-  { id: "asset_7", sourcePlatform: "plr_marketplace", sourceUrl: "https://plr-master/affiliate-mega", assetType: "plr_pack", title: "PLR — Affiliate Marketing Mega Bundle", askingPriceUsd: 89, monthlyRevenueUsd: null, license: "Resell rights, branded edits OK.", niche: "plr_pack", notes: "Modernize for AI-era affiliate.", status: "acquired", createdAt: isoMinusDays(14) },
-  { id: "asset_8", sourcePlatform: "kaggle", sourceUrl: "https://kaggle.com/datasets/sp500-earnings", assetType: "dataset", title: "S&P 500 Earnings Call Sentiment", askingPriceUsd: null, monthlyRevenueUsd: null, license: "MIT", niche: "dataset", notes: "Wrap behind an API for finance creators.", status: "new", createdAt: isoMinusDays(0) },
-  { id: "asset_9", sourcePlatform: "flippa", sourceUrl: "https://flippa.com/etsy-shop-stickers", assetType: "expired_etsy", title: "Etsy Shop — Sticker Empire", askingPriceUsd: 4200, monthlyRevenueUsd: 720, license: null, niche: "etsy_printable", notes: "200+ active SKUs; pricing high.", status: "passed", createdAt: isoMinusDays(20) },
-  { id: "asset_10", sourcePlatform: "micro_acquire", sourceUrl: "https://acquire.com/listing/def", assetType: "microacquire_listing", title: "Micro-SaaS — SEO Snapshot", askingPriceUsd: 12000, monthlyRevenueUsd: 600, license: "Full IP.", niche: "micro_saas", notes: "Stagnant for 6 months — re-launch potential.", status: "new", createdAt: isoMinusDays(6) },
-  { id: "asset_11", sourcePlatform: "plr_marketplace", sourceUrl: "https://plr/budget-binder", assetType: "plr_pack", title: "PLR — Budget Binder Printable", askingPriceUsd: 28, monthlyRevenueUsd: null, license: "Resell rights, no master rights.", niche: "etsy_printable", notes: "Pair with KDP low-content version.", status: "reviewing", createdAt: isoMinusDays(11) },
-  { id: "asset_12", sourcePlatform: "flippa", sourceUrl: "https://flippa.com/expired-domain-promptkeep", assetType: "expired_domain", title: "promptkeep.app — expired", askingPriceUsd: 380, monthlyRevenueUsd: null, license: null, niche: "browser_extension", notes: "Tied to the PromptKeep extension idea.", status: "reviewing", createdAt: isoMinusDays(4) },
+  {
+    id: "asset_1",
+    sourcePlatform: "kaggle",
+    sourceUrl: "https://kaggle.com/datasets/jcsmnz/etsy-top-100",
+    assetType: "dataset",
+    title: "Etsy Top-100 Daily Snapshot 2024-2025",
+    askingPriceUsd: null,
+    monthlyRevenueUsd: null,
+    license: "MIT",
+    niche: "etsy_printable",
+    notes: "Wraps perfectly into a $9/mo trend tracker.",
+    status: "reviewing",
+    createdAt: isoMinusDays(2),
+  },
+  {
+    id: "asset_2",
+    sourcePlatform: "plr_marketplace",
+    sourceUrl: "https://plr.me/wellness-articles-50",
+    assetType: "plr_pack",
+    title: "PLR — 50 Wellness Articles Pack",
+    askingPriceUsd: 47,
+    monthlyRevenueUsd: null,
+    license: "Resell rights, no master rights.",
+    niche: "plr_pack",
+    notes: "Refresh hooks and bundle as ebook.",
+    status: "new",
+    createdAt: isoMinusDays(5),
+  },
+  {
+    id: "asset_3",
+    sourcePlatform: "flippa",
+    sourceUrl: "https://flippa.com/12345-etsy-shop",
+    assetType: "expired_etsy",
+    title: "Etsy Shop — Boho Wedding Printables",
+    askingPriceUsd: 1800,
+    monthlyRevenueUsd: 320,
+    license: null,
+    niche: "etsy_printable",
+    notes: "Owner motivated; shop has 2k followers.",
+    status: "negotiating",
+    createdAt: isoMinusDays(3),
+  },
+  {
+    id: "asset_4",
+    sourcePlatform: "micro_acquire",
+    sourceUrl: "https://acquire.com/listing/abc",
+    assetType: "microacquire_listing",
+    title: "Micro-SaaS — Twitter Schedule Tool",
+    askingPriceUsd: 8500,
+    monthlyRevenueUsd: 480,
+    license: "Full IP transfer.",
+    niche: "micro_saas",
+    notes: "Tech debt acceptable; $480 MRR.",
+    status: "reviewing",
+    createdAt: isoMinusDays(8),
+  },
+  {
+    id: "asset_5",
+    sourcePlatform: "kaggle",
+    sourceUrl: "https://kaggle.com/datasets/reddit-entrepreneur",
+    assetType: "dataset",
+    title: "Reddit r/entrepreneur Submissions Dataset",
+    askingPriceUsd: null,
+    monthlyRevenueUsd: null,
+    license: "CC-BY 4.0",
+    niche: "dataset",
+    notes: "Slice into a daily trend digest.",
+    status: "new",
+    createdAt: isoMinusDays(1),
+  },
+  {
+    id: "asset_6",
+    sourcePlatform: "flippa",
+    sourceUrl: "https://flippa.com/expired-domain-aestheticfinance",
+    assetType: "expired_domain",
+    title: "aestheticfinance.com — expired",
+    askingPriceUsd: 220,
+    monthlyRevenueUsd: null,
+    license: null,
+    niche: "etsy_printable",
+    notes: "Brand fits the 'aesthetic finance' trend.",
+    status: "passed",
+    createdAt: isoMinusDays(10),
+  },
+  {
+    id: "asset_7",
+    sourcePlatform: "plr_marketplace",
+    sourceUrl: "https://plr-master/affiliate-mega",
+    assetType: "plr_pack",
+    title: "PLR — Affiliate Marketing Mega Bundle",
+    askingPriceUsd: 89,
+    monthlyRevenueUsd: null,
+    license: "Resell rights, branded edits OK.",
+    niche: "plr_pack",
+    notes: "Modernize for AI-era affiliate.",
+    status: "acquired",
+    createdAt: isoMinusDays(14),
+  },
+  {
+    id: "asset_8",
+    sourcePlatform: "kaggle",
+    sourceUrl: "https://kaggle.com/datasets/sp500-earnings",
+    assetType: "dataset",
+    title: "S&P 500 Earnings Call Sentiment",
+    askingPriceUsd: null,
+    monthlyRevenueUsd: null,
+    license: "MIT",
+    niche: "dataset",
+    notes: "Wrap behind an API for finance creators.",
+    status: "new",
+    createdAt: isoMinusDays(0),
+  },
+  {
+    id: "asset_9",
+    sourcePlatform: "flippa",
+    sourceUrl: "https://flippa.com/etsy-shop-stickers",
+    assetType: "expired_etsy",
+    title: "Etsy Shop — Sticker Empire",
+    askingPriceUsd: 4200,
+    monthlyRevenueUsd: 720,
+    license: null,
+    niche: "etsy_printable",
+    notes: "200+ active SKUs; pricing high.",
+    status: "passed",
+    createdAt: isoMinusDays(20),
+  },
+  {
+    id: "asset_10",
+    sourcePlatform: "micro_acquire",
+    sourceUrl: "https://acquire.com/listing/def",
+    assetType: "microacquire_listing",
+    title: "Micro-SaaS — SEO Snapshot",
+    askingPriceUsd: 12000,
+    monthlyRevenueUsd: 600,
+    license: "Full IP.",
+    niche: "micro_saas",
+    notes: "Stagnant for 6 months — re-launch potential.",
+    status: "new",
+    createdAt: isoMinusDays(6),
+  },
+  {
+    id: "asset_11",
+    sourcePlatform: "plr_marketplace",
+    sourceUrl: "https://plr/budget-binder",
+    assetType: "plr_pack",
+    title: "PLR — Budget Binder Printable",
+    askingPriceUsd: 28,
+    monthlyRevenueUsd: null,
+    license: "Resell rights, no master rights.",
+    niche: "etsy_printable",
+    notes: "Pair with KDP low-content version.",
+    status: "reviewing",
+    createdAt: isoMinusDays(11),
+  },
+  {
+    id: "asset_12",
+    sourcePlatform: "flippa",
+    sourceUrl: "https://flippa.com/expired-domain-promptkeep",
+    assetType: "expired_domain",
+    title: "promptkeep.app — expired",
+    askingPriceUsd: 380,
+    monthlyRevenueUsd: null,
+    license: null,
+    niche: "browser_extension",
+    notes: "Tied to the PromptKeep extension idea.",
+    status: "reviewing",
+    createdAt: isoMinusDays(4),
+  },
 ];
 
 // ----------------------------- Conversations + Messages -----------------------------
@@ -1000,65 +1703,162 @@ const buildMessages = (conv: (typeof conversationSeeds)[number]): Message[] => {
     case "global":
       turns.push(
         { role: "user", content: "What should I build this weekend? I have ~16 hours." },
-        { role: "assistant", content: "Three weekend-shaped bets jump out:\n\n1. **Etsy printable bundle for 'aesthetic finance'** — score 87. Search up 220% w/w, low competition pocket.\n2. **Notion template + Figma asset hybrid for podcast operators** — score 81. Repeat-buyer market.\n3. **AI prompt pack for cold outreach using Claude** — score 79.\n\nWant me to draft a one-pager for #1?" },
+        {
+          role: "assistant",
+          content:
+            "Three weekend-shaped bets jump out:\n\n1. **Etsy printable bundle for 'aesthetic finance'** — score 87. Search up 220% w/w, low competition pocket.\n2. **Notion template + Figma asset hybrid for podcast operators** — score 81. Repeat-buyer market.\n3. **AI prompt pack for cold outreach using Claude** — score 79.\n\nWant me to draft a one-pager for #1?",
+        },
         { role: "user", content: "Yes — and tell me where the trademark risk is." },
-        { role: "assistant", content: "Trademark risk: low. 'Aesthetic finance' is descriptive, not registered. Avoid Disney-adjacent illustrations. Steer clear of Apple's calculator UI clones in your mockups. Use original typography only.\n\nDrafting one-pager now..." },
+        {
+          role: "assistant",
+          content:
+            "Trademark risk: low. 'Aesthetic finance' is descriptive, not registered. Avoid Disney-adjacent illustrations. Steer clear of Apple's calculator UI clones in your mockups. Use original typography only.\n\nDrafting one-pager now...",
+        },
         { role: "user", content: "What's the tier-2 monetization?" },
-        { role: "assistant", content: "Tier 2: $19 'Editable Canva' upsell with 12 swap-in templates. Tier 3: $49 lifetime access to a private Notion dashboard with weekly drops. Margin holds because tier 3 is delivery-light." },
+        {
+          role: "assistant",
+          content:
+            "Tier 2: $19 'Editable Canva' upsell with 12 swap-in templates. Tier 3: $49 lifetime access to a private Notion dashboard with weekly drops. Margin holds because tier 3 is delivery-light.",
+        },
         { role: "user", content: "OK what's the win condition for week 1?" },
-        { role: "assistant", content: "10 sales in week 1 = signal-fit. 5-star avg over 20 reviews. If <5 sales, kill the SKU and pivot to wedding-niche variant." },
+        {
+          role: "assistant",
+          content:
+            "10 sales in week 1 = signal-fit. 5-star avg over 20 reviews. If <5 sales, kill the SKU and pivot to wedding-niche variant.",
+        },
         { role: "user", content: "Add it to my shortlist." },
-        { role: "assistant", content: "Done. Shortlisted opportunity_1. I'll auto-update score nightly and ping you if any rule modifier flips." },
+        {
+          role: "assistant",
+          content:
+            "Done. Shortlisted opportunity_1. I'll auto-update score nightly and ping you if any rule modifier flips.",
+        },
       );
       break;
     case "opportunity":
       turns.push(
-        { role: "user", content: "Pressure-test the Notion second-brain replication idea. Where does it die?" },
-        { role: "assistant", content: "It dies at distribution. The market has 50+ Notion templates ranking for 'second brain'. The mechanic-fit is strong, but the trust gap is hard.\n\nMitigation: ship a 'second brain for indie SaaS founders' niche cut, not generic. Distribution lever: free 5-page sample on a TikTok-friendly demo." },
+        {
+          role: "user",
+          content: "Pressure-test the Notion second-brain replication idea. Where does it die?",
+        },
+        {
+          role: "assistant",
+          content:
+            "It dies at distribution. The market has 50+ Notion templates ranking for 'second brain'. The mechanic-fit is strong, but the trust gap is hard.\n\nMitigation: ship a 'second brain for indie SaaS founders' niche cut, not generic. Distribution lever: free 5-page sample on a TikTok-friendly demo.",
+        },
         { role: "user", content: "Is the build effort tag of 'week' realistic?" },
-        { role: "assistant", content: "If you bring an existing system, yes. From scratch, it's 12-16 days. The hard part isn't the database design, it's writing the documentation and recording the loom walkthroughs." },
+        {
+          role: "assistant",
+          content:
+            "If you bring an existing system, yes. From scratch, it's 12-16 days. The hard part isn't the database design, it's writing the documentation and recording the loom walkthroughs.",
+        },
         { role: "user", content: "Score breakdown — why is competition only 38?" },
-        { role: "assistant", content: "Competition score 38 (out of 100, lower = more competition) reflects: 50+ existing templates, 5 in the same vertical, but most are visually outdated and lack a 'CRM lite' add-on which 60% of buyer comments request. So the *visible* competition is high, but the *quality-adjusted* competition is moderate." },
-        { role: "user", content: "What's the one experiment I should run before committing 2 weeks?" },
-        { role: "assistant", content: "Post a 60-second TikTok 'tour' of the prototype's weekly review screen with a Stan Store waitlist link. If it pulls 100+ waitlist in 72 hours → green light. If <30 → either reposition or kill." },
+        {
+          role: "assistant",
+          content:
+            "Competition score 38 (out of 100, lower = more competition) reflects: 50+ existing templates, 5 in the same vertical, but most are visually outdated and lack a 'CRM lite' add-on which 60% of buyer comments request. So the *visible* competition is high, but the *quality-adjusted* competition is moderate.",
+        },
+        {
+          role: "user",
+          content: "What's the one experiment I should run before committing 2 weeks?",
+        },
+        {
+          role: "assistant",
+          content:
+            "Post a 60-second TikTok 'tour' of the prototype's weekly review screen with a Stan Store waitlist link. If it pulls 100+ waitlist in 72 hours → green light. If <30 → either reposition or kill.",
+        },
         { role: "user", content: "Lock it in. Mark it as 'building' but assigned to next sprint." },
-        { role: "assistant", content: "Done — opportunity_2 marked 'building' with owner=you, sprint=next. I'll resurface in feed when momentum changes by ±10 points." },
+        {
+          role: "assistant",
+          content:
+            "Done — opportunity_2 marked 'building' with owner=you, sprint=next. I'll resurface in feed when momentum changes by ±10 points.",
+        },
       );
       break;
     case "creator":
       turns.push(
         { role: "user", content: "How does Notion North price their bundles?" },
-        { role: "assistant", content: "Three tiers:\n- $9 single template\n- $39 'Founder OS' bundle (4 templates)\n- $129 'Lifetime All-Access' (everything + Discord)\n\nKeystone is the $39 bundle. They run it through a Pinterest funnel + a weekly TikTok tour." },
+        {
+          role: "assistant",
+          content:
+            "Three tiers:\n- $9 single template\n- $39 'Founder OS' bundle (4 templates)\n- $129 'Lifetime All-Access' (everything + Discord)\n\nKeystone is the $39 bundle. They run it through a Pinterest funnel + a weekly TikTok tour.",
+        },
         { role: "user", content: "What's their posting cadence?" },
-        { role: "assistant", content: "Every Tuesday: one new template release. Every Friday: a TikTok demo of an existing template. Discord weekly office hours on Thursdays. Email list gets the new template a day early — converts at ~6%." },
+        {
+          role: "assistant",
+          content:
+            "Every Tuesday: one new template release. Every Friday: a TikTok demo of an existing template. Discord weekly office hours on Thursdays. Email list gets the new template a day early — converts at ~6%.",
+        },
         { role: "user", content: "How do they handle support?" },
-        { role: "assistant", content: "Discord-first. They use a #questions channel with a tagged 'community helper' role. Founder responds personally to bundle buyers within 24h. No chat support for $9 buyers." },
+        {
+          role: "assistant",
+          content:
+            "Discord-first. They use a #questions channel with a tagged 'community helper' role. Founder responds personally to bundle buyers within 24h. No chat support for $9 buyers.",
+        },
         { role: "user", content: "What's their differentiation moat?" },
-        { role: "assistant", content: "Brand and bundle stacking. Their 'Founder OS' has a strong visual identity (editorial neutral palette, serif headers) that's hard to clone without looking derivative. Plus they bundle aggressively — 4 SKUs makes price comparison harder." },
+        {
+          role: "assistant",
+          content:
+            "Brand and bundle stacking. Their 'Founder OS' has a strong visual identity (editorial neutral palette, serif headers) that's hard to clone without looking derivative. Plus they bundle aggressively — 4 SKUs makes price comparison harder.",
+        },
         { role: "user", content: "What would *I* do differently?" },
-        { role: "assistant", content: "Two things:\n1. Vertical-specific cuts (indie SaaS, agency, podcast) — they're horizontal-only.\n2. CRM-lite add-on — buyer comments request it, they don't ship it. That's a $19 upsell waiting." },
+        {
+          role: "assistant",
+          content:
+            "Two things:\n1. Vertical-specific cuts (indie SaaS, agency, podcast) — they're horizontal-only.\n2. CRM-lite add-on — buyer comments request it, they don't ship it. That's a $19 upsell waiting.",
+        },
         { role: "user", content: "Save those two ideas as opportunities." },
-        { role: "assistant", content: "Created two new opportunities, both linked to creator_2 as competitive context." },
+        {
+          role: "assistant",
+          content:
+            "Created two new opportunities, both linked to creator_2 as competitive context.",
+        },
       );
       break;
     case "dataset_review":
       turns.push(
         { role: "user", content: "Is the S&P earnings dataset worth wrapping?" },
-        { role: "assistant", content: "Yes, conditionally. It's MIT-licensed and 4.2GB. The wrap-and-resell play:\n- Vertical: finance creators / hedge fund Substack writers\n- Format: $29/mo searchable webapp + weekly digest\n- Moat: the value is in the slicing UX, not the raw data" },
+        {
+          role: "assistant",
+          content:
+            "Yes, conditionally. It's MIT-licensed and 4.2GB. The wrap-and-resell play:\n- Vertical: finance creators / hedge fund Substack writers\n- Format: $29/mo searchable webapp + weekly digest\n- Moat: the value is in the slicing UX, not the raw data",
+        },
         { role: "user", content: "What's my distribution wedge?" },
-        { role: "assistant", content: "FinTwit threads. Pick 5 'mispriced earnings reactions' per week from the dataset, post them as a chart-heavy thread on Tuesday + Wednesday. Each thread links to your tool. Aim for 3-5% conversion to free trial." },
+        {
+          role: "assistant",
+          content:
+            "FinTwit threads. Pick 5 'mispriced earnings reactions' per week from the dataset, post them as a chart-heavy thread on Tuesday + Wednesday. Each thread links to your tool. Aim for 3-5% conversion to free trial.",
+        },
         { role: "user", content: "What's the build effort?" },
-        { role: "assistant", content: "Week-shaped if you skip ML enrichment. Month-shaped if you want sentiment scoring beyond the dataset's existing labels." },
+        {
+          role: "assistant",
+          content:
+            "Week-shaped if you skip ML enrichment. Month-shaped if you want sentiment scoring beyond the dataset's existing labels.",
+        },
         { role: "user", content: "How do I avoid SEC issues?" },
-        { role: "assistant", content: "Surface raw data + factual signals only. Never editorialize or recommend 'buy/sell'. Add a clear disclaimer: 'Not investment advice.' Stay descriptive, not prescriptive. If you do thread examples, make them historical, not current-cycle." },
+        {
+          role: "assistant",
+          content:
+            "Surface raw data + factual signals only. Never editorialize or recommend 'buy/sell'. Add a clear disclaimer: 'Not investment advice.' Stay descriptive, not prescriptive. If you do thread examples, make them historical, not current-cycle.",
+        },
         { role: "user", content: "What pricing makes this work?" },
-        { role: "assistant", content: "$29/mo solo, $79/mo team (3 seats), $299/mo enterprise (API access). Annual prepay 2 months free. Target $5k MRR by month 3." },
+        {
+          role: "assistant",
+          content:
+            "$29/mo solo, $79/mo team (3 seats), $299/mo enterprise (API access). Annual prepay 2 months free. Target $5k MRR by month 3.",
+        },
         { role: "user", content: "Let me think about it. Mark as 'reviewing'." },
-        { role: "assistant", content: "Done — asset_8 marked 'reviewing' with owner=you. I'll resurface if a similar dataset gets wrapped publicly in the next 30 days." },
+        {
+          role: "assistant",
+          content:
+            "Done — asset_8 marked 'reviewing' with owner=you. I'll resurface if a similar dataset gets wrapped publicly in the next 30 days.",
+        },
       );
       break;
     default:
-      turns.push({ role: "user", content: "Hello" }, { role: "assistant", content: "Hi! How can I help?" });
+      turns.push(
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi! How can I help?" },
+      );
   }
   turns.forEach((turn, idx) => {
     messages.push({
@@ -1094,14 +1894,14 @@ export const mockActivity: ActivityEntry[] = Array.from({ length: 25 }).map((_, 
   const user = mockUsers[i % mockUsers.length] as MockUser;
   const targetId =
     tmpl.entity === "opportunity"
-      ? mockOpportunities[i % mockOpportunities.length]?.id ?? "opportunity_1"
+      ? (mockOpportunities[i % mockOpportunities.length]?.id ?? "opportunity_1")
       : tmpl.entity === "rule"
-      ? mockGoldenRules[i % mockGoldenRules.length]?.id ?? "rule_1"
-      : tmpl.entity === "source"
-      ? mockSources[i % mockSources.length]?.id ?? "source_etsy"
-      : tmpl.entity === "digest"
-      ? mockDigests[i % mockDigests.length]?.id ?? "digest_daily_1"
-      : mockConversations[i % mockConversations.length]?.id ?? "conv_1";
+        ? (mockGoldenRules[i % mockGoldenRules.length]?.id ?? "rule_1")
+        : tmpl.entity === "source"
+          ? (mockSources[i % mockSources.length]?.id ?? "source_etsy")
+          : tmpl.entity === "digest"
+            ? (mockDigests[i % mockDigests.length]?.id ?? "digest_daily_1")
+            : (mockConversations[i % mockConversations.length]?.id ?? "conv_1");
   return {
     id: `activity_${i + 1}`,
     userId: user.id,

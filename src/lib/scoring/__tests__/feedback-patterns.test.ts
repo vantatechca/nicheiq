@@ -33,19 +33,27 @@ describe("applyFeedbackPatterns", () => {
   });
 
   it("positive delta from save/build/vote-derived patterns", () => {
-    const out = applyFeedbackPatterns(opp, [pattern({ signalKeywords: ["claude"], derivedFrom: "saves" })]);
+    const out = applyFeedbackPatterns(opp, [
+      pattern({ signalKeywords: ["claude"], derivedFrom: "saves" }),
+    ]);
     expect(out.delta).toBeGreaterThan(0);
     expect(out.modifiers).toHaveLength(1);
   });
 
   it("negative delta from abandons-derived patterns", () => {
-    const out = applyFeedbackPatterns(opp, [pattern({ signalKeywords: ["claude"], derivedFrom: "abandons" })]);
+    const out = applyFeedbackPatterns(opp, [
+      pattern({ signalKeywords: ["claude"], derivedFrom: "abandons" }),
+    ]);
     expect(out.delta).toBeLessThan(0);
   });
 
   it("scales delta by weight × confidence", () => {
-    const high = applyFeedbackPatterns(opp, [pattern({ signalKeywords: ["claude"], weight: 1, confidence: 1 })]);
-    const low = applyFeedbackPatterns(opp, [pattern({ signalKeywords: ["claude"], weight: 0.2, confidence: 0.4 })]);
+    const high = applyFeedbackPatterns(opp, [
+      pattern({ signalKeywords: ["claude"], weight: 1, confidence: 1 }),
+    ]);
+    const low = applyFeedbackPatterns(opp, [
+      pattern({ signalKeywords: ["claude"], weight: 0.2, confidence: 0.4 }),
+    ]);
     expect(high.delta).toBeGreaterThan(low.delta);
   });
 

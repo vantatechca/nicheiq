@@ -35,8 +35,8 @@ Standardized response envelope from `src/lib/api/`:
 
 ```ts
 import { ok, fail } from "@/lib/api/response";
-return ok(data);                     // { ok: true, data }
-return fail("Invalid input", 400);   // { ok: false, error }
+return ok(data); // { ok: true, data }
+return fail("Invalid input", 400); // { ok: false, error }
 ```
 
 Every public route MUST:

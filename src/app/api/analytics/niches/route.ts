@@ -29,7 +29,15 @@ export async function GET(_req: NextRequest) {
     })
     .from(niches)
     .leftJoin(opportunities, eq(opportunities.niche, niches.slug))
-    .groupBy(niches.id, niches.slug, niches.label, niches.description, niches.parentId, niches.iconKey, niches.createdAt)
+    .groupBy(
+      niches.id,
+      niches.slug,
+      niches.label,
+      niches.description,
+      niches.parentId,
+      niches.iconKey,
+      niches.createdAt,
+    )
     .orderBy(niches.label);
 
   return ok({ niches: rows });

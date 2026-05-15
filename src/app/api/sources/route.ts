@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     .insert(sources)
     .values({
       id: `source_user_${Date.now()}`,
-      sourcePlatform:
-        parsed.data.sourcePlatform as typeof sources.sourcePlatform.enumValues[number],
+      sourcePlatform: parsed.data
+        .sourcePlatform as (typeof sources.sourcePlatform.enumValues)[number],
       label: parsed.data.label,
       config: parsed.data.config ?? {},
       enabled: true,

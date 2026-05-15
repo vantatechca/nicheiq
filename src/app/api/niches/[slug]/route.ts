@@ -1,14 +1,7 @@
 import { NextRequest } from "next/server";
 import { desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import {
-  niches,
-  opportunities,
-  products,
-  creators,
-  trends,
-  signals,
-} from "@/lib/db/schema";
+import { niches, opportunities, products, creators, trends, signals } from "@/lib/db/schema";
 import { ok, notFound, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 
@@ -17,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   if (!session) return unauthorized();
 
   const db = getDb();
-  const slug = params.slug as typeof niches.slug.enumValues[number];
+  const slug = params.slug as (typeof niches.slug.enumValues)[number];
 
   // First fetch the niche so we can 404 fast if it doesn't exist.
   // Avoids running 5 expensive parallel queries on an invalid slug.
@@ -33,11 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
       .where(eq(opportunities.niche, slug))
       .orderBy(desc(opportunities.score)),
 
-    db
-      .select()
-      .from(products)
-      .where(eq(products.niche, slug))
-      .limit(24),
+    db.select().from(products).where(eq(products.niche, slug)).limit(24),
 
     // creators.niches is text[] — `arrayContains` produces:
     //   WHERE creators.niches @> ARRAY[slug]
@@ -48,12 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
 
     db.select().from(trends).where(eq(trends.niche, slug)),
 
-    db
-      .select()
-      .from(signals)
-      .where(eq(signals.niche, slug))
-      .orderBy(desc(signals.score))
-      .limit(24),
+    db.select().from(signals).where(eq(signals.niche, slug)).orderBy(desc(signals.score)).limit(24),
   ]);
 
   return ok({

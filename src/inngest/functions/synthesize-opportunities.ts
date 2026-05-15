@@ -10,12 +10,10 @@ type NicheGroup = {
   topSignals: Array<{ id: string; title: string; score: number }>;
 };
 
-
 export const synthesizeOpportunities = inngest.createFunction(
   { id: "synthesize-opportunities", retries: 1 },
   { cron: "0 */4 * * *" },
   async ({ step, logger }) => {
-
     // Step 1: fetch recent signals grouped by niche
     const nicheGroups = await step.run("fetch-signals-by-niche", async () => {
       const db = getDb();
@@ -41,12 +39,7 @@ export const synthesizeOpportunities = inngest.createFunction(
         const topSignals = await db
           .select({ id: signals.id, title: signals.title, score: signals.score })
           .from(signals)
-          .where(
-            and(
-              gt(signals.processedAt, since),
-              eq(signals.niche, niche),
-            ),
-          )
+          .where(and(gt(signals.processedAt, since), eq(signals.niche, niche)))
           .orderBy(desc(signals.score))
           .limit(15);
 
@@ -65,7 +58,7 @@ export const synthesizeOpportunities = inngest.createFunction(
     // Step 2: check spend cap
     const spendCheck = await step.run("check-spend-cap", async () => {
       const { reserveSpend } = await import("@/lib/ai/client");
-      return await reserveSpend(0.20);
+      return await reserveSpend(0.2);
     });
 
     if (!spendCheck.allowed) {
@@ -77,11 +70,16 @@ export const synthesizeOpportunities = inngest.createFunction(
     const proposals = await step.run("ai-propose-by-niche", async () => {
       const tier2 = selectModel({ tier: 2 });
       const results: Array<{
-        title: string; summary: string; niche: string;
-        opportunityType: string; buildEffort: string;
-        projectedRevenueUsd: number; aiRationale: string;
+        title: string;
+        summary: string;
+        niche: string;
+        opportunityType: string;
+        buildEffort: string;
+        projectedRevenueUsd: number;
+        aiRationale: string;
         aiBuildPlan: Record<string, unknown>;
-        score: number; scoreBreakdown: Record<string, number>;
+        score: number;
+        scoreBreakdown: Record<string, number>;
         sourceSignalIds: string[];
       }> = [];
 
@@ -132,7 +130,10 @@ Propose a specific digital product. Output:
             temperature: 0.4,
           });
 
-          const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+          const cleaned = text
+            .replace(/^```json\s*/i, "")
+            .replace(/```\s*$/, "")
+            .trim();
           const parsed = JSON.parse(cleaned);
           if (!parsed.title || !parsed.summary) continue;
 
@@ -167,9 +168,10 @@ Propose a specific digital product. Output:
         id: crypto.randomUUID(),
         title: p.title,
         summary: p.summary,
-        niche: p.niche as typeof opportunities.niche.enumValues[number],
-        opportunityType: p.opportunityType as typeof opportunities.opportunityType.enumValues[number],
-        buildEffort: p.buildEffort as typeof opportunities.buildEffort.enumValues[number],
+        niche: p.niche as (typeof opportunities.niche.enumValues)[number],
+        opportunityType:
+          p.opportunityType as (typeof opportunities.opportunityType.enumValues)[number],
+        buildEffort: p.buildEffort as (typeof opportunities.buildEffort.enumValues)[number],
         projectedRevenueUsd: p.projectedRevenueUsd,
         status: "tracking" as const,
         sourceProductIds: [] as string[],
@@ -183,10 +185,7 @@ Propose a specific digital product. Output:
         updatedAt: new Date(),
       }));
 
-      const result = await db
-        .insert(opportunities)
-        .values(rows)
-        .onConflictDoNothing();
+      const result = await db.insert(opportunities).values(rows).onConflictDoNothing();
 
       return result.rowCount ?? 0;
     });

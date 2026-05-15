@@ -9,12 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { RechartsLine } from "@/components/shared/recharts-line";
 import { ScoreBadge } from "@/components/shared/score-badge";
-import {
-  mockTrends,
-  mockOpportunities,
-  mockSignals,
-  mockProducts,
-} from "@/mock/data";
+import { mockTrends, mockOpportunities, mockSignals, mockProducts } from "@/mock/data";
 import { formatNumber, formatPct, timeAgo, formatUsd } from "@/lib/utils/format";
 
 export default function TrendDetailPage() {
@@ -89,13 +84,17 @@ export default function TrendDetailPage() {
         <Card className="border-slate-800 bg-slate-900/40">
           <CardContent className="p-4">
             <div className="text-[10px] uppercase text-slate-500">7d volume</div>
-            <div className="mt-1 text-2xl font-semibold">{formatNumber(trend.volume7d, { compact: true })}</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {formatNumber(trend.volume7d, { compact: true })}
+            </div>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-900/40">
           <CardContent className="p-4">
             <div className="text-[10px] uppercase text-slate-500">30d volume</div>
-            <div className="mt-1 text-2xl font-semibold">{formatNumber(trend.volume30d, { compact: true })}</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {formatNumber(trend.volume30d, { compact: true })}
+            </div>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-900/40">

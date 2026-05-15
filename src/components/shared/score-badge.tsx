@@ -11,7 +11,12 @@ interface Props {
 
 export function ScoreBadge({ score, size = "md", className, showLabel = true }: Props) {
   const bucket = bucketForScore(score);
-  const sizeCls = size === "sm" ? "text-xs px-1.5 py-0.5" : size === "lg" ? "text-base px-2.5 py-1" : "text-xs px-2 py-0.5";
+  const sizeCls =
+    size === "sm"
+      ? "text-xs px-1.5 py-0.5"
+      : size === "lg"
+        ? "text-base px-2.5 py-1"
+        : "text-xs px-2 py-0.5";
   return (
     <Badge
       variant="outline"

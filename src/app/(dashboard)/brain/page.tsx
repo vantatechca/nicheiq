@@ -52,8 +52,9 @@ function BrainView() {
   const queryId = params.get("id");
 
   // Fetch conversation list from API.
-  const { data: convData, refetch: refetchConversations } =
-    useApi<{ conversations: Conversation[] }>("/api/brain/conversations");
+  const { data: convData, refetch: refetchConversations } = useApi<{
+    conversations: Conversation[];
+  }>("/api/brain/conversations");
   const conversations = convData?.conversations ?? [];
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -91,10 +92,11 @@ function BrainView() {
 
     (async () => {
       try {
-        const res = await api.post<{ conversation: Conversation }>(
-          "/api/brain/conversations",
-          { brainMode: queryMode, contextRefs, title },
-        );
+        const res = await api.post<{ conversation: Conversation }>("/api/brain/conversations", {
+          brainMode: queryMode,
+          contextRefs,
+          title,
+        });
         if (res?.conversation) {
           setActiveId(res.conversation.id);
           setMode(queryMode);
@@ -146,10 +148,11 @@ function BrainView() {
   }
   async function newConversation() {
     try {
-      const res = await api.post<{ conversation: Conversation }>(
-        "/api/brain/conversations",
-        { brainMode: mode, contextRefs: {}, title: "Untitled conversation" },
-      );
+      const res = await api.post<{ conversation: Conversation }>("/api/brain/conversations", {
+        brainMode: mode,
+        contextRefs: {},
+        title: "Untitled conversation",
+      });
       if (res?.conversation) {
         setActiveId(res.conversation.id);
         refetchConversations();
@@ -164,7 +167,13 @@ function BrainView() {
       <Card className="flex flex-col border-slate-800 bg-slate-900/40">
         <div className="flex items-center justify-between border-b border-slate-800 p-3">
           <span className="text-sm font-semibold">Conversations</span>
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={newConversation} aria-label="New conversation">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={newConversation}
+            aria-label="New conversation"
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -215,7 +224,9 @@ function BrainView() {
                         className="mt-1 h-7 border-slate-800 bg-slate-950 text-sm"
                       />
                     ) : (
-                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-tight">{c.title}</div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-tight">
+                        {c.title}
+                      </div>
                     )}
                     <div className="text-[10px] text-slate-500">{c.messageCount} messages</div>
                   </button>
@@ -286,7 +297,8 @@ function BrainView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the chat history. The opportunities and signals it referenced are unaffected.
+              This deletes the chat history. The opportunities and signals it referenced are
+              unaffected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

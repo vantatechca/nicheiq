@@ -45,35 +45,35 @@ interface Creator {
 }
 
 export default function ProductDetailPage() {
-const router = useRouter();
-const [promoting, setPromoting] = useState(false);
+  const router = useRouter();
+  const [promoting, setPromoting] = useState(false);
 
-const handlePromote = async () => {
-  if (!product) return;
-  setPromoting(true);
-  try {
-    const res = await fetch("/api/opportunities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: `${product.title} — replication play`,
-        summary: `Replicate ${product.title} by ${product.creator ?? "unknown"} in the ${product.niche.replace(/_/g, " ")} niche.`,
-        niche: product.niche,
-        opportunityType: "replication",
-        buildEffort: "week",
-        projectedRevenueUsd: product.estMonthlyRevenueHigh ?? 1000,
-      }),
-    });
-    if (!res.ok) throw new Error("Failed");
-    const data = await res.json();
-    toast.success("Opportunity created!");
-    router.push(`/opportunities/${data.data.opportunity.id}`);
-  } catch {
-    toast.error("Failed to promote");
-  } finally {
-    setPromoting(false);
-  }
-};
+  const handlePromote = async () => {
+    if (!product) return;
+    setPromoting(true);
+    try {
+      const res = await fetch("/api/opportunities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${product.title} — replication play`,
+          summary: `Replicate ${product.title} by ${product.creator ?? "unknown"} in the ${product.niche.replace(/_/g, " ")} niche.`,
+          niche: product.niche,
+          opportunityType: "replication",
+          buildEffort: "week",
+          projectedRevenueUsd: product.estMonthlyRevenueHigh ?? 1000,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      toast.success("Opportunity created!");
+      router.push(`/opportunities/${data.data.opportunity.id}`);
+    } catch {
+      toast.error("Failed to promote");
+    } finally {
+      setPromoting(false);
+    }
+  };
 
   const { id } = useParams<{ id: string }>();
 
@@ -93,9 +93,7 @@ const handlePromote = async () => {
   const { data: similarData } = useApi<{ products: Product[] }>(
     product ? `/api/products?niche=${product.niche}&limit=10` : null,
   );
-  const similar = (similarData?.products ?? [])
-    .filter((p) => p.id !== product?.id)
-    .slice(0, 6);
+  const similar = (similarData?.products ?? []).filter((p) => p.id !== product?.id).slice(0, 6);
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading product…</div>;
   if (!product) return <div className="p-6 text-sm text-slate-400">Product not found.</div>;
@@ -119,9 +117,9 @@ const handlePromote = async () => {
               </a>
             </Button>
             <Button size="sm" onClick={handlePromote} disabled={promoting}>
-          <Sparkles className="mr-1 h-4 w-4" />
-          {promoting ? "Promoting…" : "Promote to opportunity"}
-        </Button>
+              <Sparkles className="mr-1 h-4 w-4" />
+              {promoting ? "Promoting…" : "Promote to opportunity"}
+            </Button>
           </>
         }
       />
@@ -131,7 +129,11 @@ const handlePromote = async () => {
           <Card className="overflow-hidden border-slate-800 bg-slate-900/40">
             <div className="relative aspect-[16/9] bg-slate-800">
               {product.thumbnailUrl ? (
-                <img src={product.thumbnailUrl} alt={product.title} className="h-full w-full object-cover" />
+                <img
+                  src={product.thumbnailUrl}
+                  alt={product.title}
+                  className="h-full w-full object-cover"
+                />
               ) : null}
             </div>
             <CardContent className="p-4">
@@ -163,7 +165,10 @@ const handlePromote = async () => {
                 />
                 <Stat
                   label="Est. monthly revenue"
-                  value={formatRange(product.estMonthlyRevenueLow ?? 0, product.estMonthlyRevenueHigh ?? 0)}
+                  value={formatRange(
+                    product.estMonthlyRevenueLow ?? 0,
+                    product.estMonthlyRevenueHigh ?? 0,
+                  )}
                 />
                 <Stat label="First seen" value={timeAgo(product.createdAt)} />
               </div>
@@ -194,7 +199,8 @@ const handlePromote = async () => {
                     {s.ratingAvg != null ? (
                       <>
                         {" · "}
-                        <Star className="inline h-3 w-3 fill-amber-400 text-amber-400" /> {s.ratingAvg.toFixed(1)}
+                        <Star className="inline h-3 w-3 fill-amber-400 text-amber-400" />{" "}
+                        {s.ratingAvg.toFixed(1)}
                       </>
                     ) : null}
                   </div>

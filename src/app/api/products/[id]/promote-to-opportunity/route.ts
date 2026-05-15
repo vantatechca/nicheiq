@@ -13,11 +13,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const db = getDb();
 
   // Look up the source product.
-  const [product] = await db
-    .select()
-    .from(products)
-    .where(eq(products.id, params.id))
-    .limit(1);
+  const [product] = await db.select().from(products).where(eq(products.id, params.id)).limit(1);
   if (!product) return notFound("Product not found");
 
   // Build a replication-type opportunity from the product. Score starts at 60

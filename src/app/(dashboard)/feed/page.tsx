@@ -110,7 +110,12 @@ export default function FeedPage() {
             onChange={setNiche}
             emptyLabel="All niches"
           />
-          <FilterChips options={signalTypes} value={type} onChange={setType} emptyLabel="All types" />
+          <FilterChips
+            options={signalTypes}
+            value={type}
+            onChange={setType}
+            emptyLabel="All types"
+          />
         </div>
       </Card>
 
@@ -145,13 +150,28 @@ export default function FeedPage() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success("Voted up")}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => toast.success("Voted up")}
+                >
                   <ThumbsUp className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success("Voted down")}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => toast.success("Voted down")}
+                >
                   <ThumbsDown className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success("Saved")}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => toast.success("Saved")}
+                >
                   <Bookmark className="h-3 w-3" />
                 </Button>
                 <Button asChild variant="ghost" size="icon" className="h-7 w-7">

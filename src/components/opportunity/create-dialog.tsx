@@ -17,12 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  NICHE_LIST,
-  OPPORTUNITY_TYPES,
-  BUILD_EFFORTS,
-} from "@/lib/utils/constants";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { NICHE_LIST, OPPORTUNITY_TYPES, BUILD_EFFORTS } from "@/lib/utils/constants";
 
 export function OpportunityCreateDialog({ trigger }: { trigger?: React.ReactNode }) {
   const router = useRouter();
@@ -93,7 +95,8 @@ export function OpportunityCreateDialog({ trigger }: { trigger?: React.ReactNode
         <DialogHeader>
           <DialogTitle>New opportunity</DialogTitle>
           <DialogDescription>
-            Manually track an opportunity. The Brain will score it and surface related signals next pass.
+            Manually track an opportunity. The Brain will score it and surface related signals next
+            pass.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

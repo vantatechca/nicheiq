@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const conditions: SQL[] = [];
-  if (niche) conditions.push(eq(trends.niche, niche as typeof trends.niche.enumValues[number]));
+  if (niche) conditions.push(eq(trends.niche, niche as (typeof trends.niche.enumValues)[number]));
 
   const rows = await db
     .select()

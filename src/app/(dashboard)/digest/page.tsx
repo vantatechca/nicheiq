@@ -142,7 +142,10 @@ function DigestCard({ digest }: { digest: Digest }) {
           <div className="text-xs uppercase text-slate-500">Top products</div>
           <ul className="mt-1 space-y-1">
             {digest.topProducts.map((p) => (
-              <li key={p.id} className="flex justify-between rounded-md bg-slate-950/40 px-2 py-1 text-xs">
+              <li
+                key={p.id}
+                className="flex justify-between rounded-md bg-slate-950/40 px-2 py-1 text-xs"
+              >
                 <span className="line-clamp-1">{p.title}</span>
                 <span className="text-emerald-400">{formatUsd(p.revenue, { compact: true })}</span>
               </li>

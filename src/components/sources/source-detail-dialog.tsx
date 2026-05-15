@@ -77,7 +77,9 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
             {source.label}
           </DialogTitle>
           <DialogDescription>
-            <code className="rounded bg-slate-800 px-1 text-[10px] uppercase">{platform?.category}</code>
+            <code className="rounded bg-slate-800 px-1 text-[10px] uppercase">
+              {platform?.category}
+            </code>
             <span className="ml-2">{source.sourcePlatform.replace(/_/g, " ")}</span>
             {source.requiresHeadless ? (
               <Badge variant="warning" className="ml-2 text-[10px]">
@@ -131,7 +133,8 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
                 placeholder="0 */6 * * *"
               />
               <p className="mt-1 text-[11px] text-slate-500">
-                Standard 5-field cron. Tip: <code className="bg-slate-800 px-1">*/30 * * * *</code> = every 30 min.
+                Standard 5-field cron. Tip: <code className="bg-slate-800 px-1">*/30 * * * *</code>{" "}
+                = every 30 min.
               </p>
             </div>
             <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
@@ -151,7 +154,11 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
                     <div className="flex items-center gap-2">
                       <Badge
                         variant={
-                          r.status === "ok" ? "success" : r.status === "error" ? "destructive" : "info"
+                          r.status === "ok"
+                            ? "success"
+                            : r.status === "error"
+                              ? "destructive"
+                              : "info"
                         }
                       >
                         {r.status}
@@ -175,7 +182,10 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
             </pre>
             <p className="mt-2 text-[11px] text-slate-500">
               <ExternalLink className="mr-1 inline h-3 w-3" />
-              In production this is the row from <code className="bg-slate-800 px-1">sources</code> in Postgres.
+              In production this is the row from <code className="bg-slate-800 px-1">
+                sources
+              </code>{" "}
+              in Postgres.
             </p>
           </TabsContent>
         </Tabs>

@@ -57,7 +57,10 @@ export function SavedViews({ current, onLoad }: Props) {
       return;
     }
     const id = `view_${Date.now()}`;
-    setViews((prev) => [{ id, name: trimmed, filters: current, createdAt: new Date().toISOString() }, ...prev]);
+    setViews((prev) => [
+      { id, name: trimmed, filters: current, createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
     setName("");
     setOpen(false);
     toast.success(`View "${trimmed}" saved`);
@@ -112,7 +115,12 @@ export function SavedViews({ current, onLoad }: Props) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }}>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setOpen(true);
+            }}
+          >
             <BookmarkPlus className="h-4 w-4" /> Save current filters…
           </DropdownMenuItem>
         </DropdownMenuContent>

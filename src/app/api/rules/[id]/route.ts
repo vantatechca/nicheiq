@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.ruleType !== undefined) updates.ruleType = parsed.data.ruleType;
   if (parsed.data.niche !== undefined)
     updates.niche = parsed.data.niche
-      ? (parsed.data.niche as typeof goldenRules.niche.enumValues[number])
+      ? (parsed.data.niche as (typeof goldenRules.niche.enumValues)[number])
       : null;
   if (parsed.data.keywords !== undefined) updates.keywords = parsed.data.keywords;
   if (parsed.data.weight !== undefined) updates.weight = parsed.data.weight;
