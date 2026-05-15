@@ -46,7 +46,9 @@ export default function SourcesPage() {
   }
 
   async function testCrawl(id: string) {
-    toast.info("Crawl queued…", { description: `Inspecting ${id}. Results will appear in signals.` });
+    toast.info("Crawl queued…", {
+      description: `Inspecting ${id}. Results will appear in signals.`,
+    });
     try {
       await api.post(`/api/sources/${id}/test-crawl`);
     } catch (err) {
@@ -97,9 +99,7 @@ export default function SourcesPage() {
                   <CardTitle className="flex items-center gap-2 text-base">
                     <span className="text-lg">{platformMeta?.icon}</span> {s.label}
                   </CardTitle>
-                  <CardDescription className="capitalize">
-                    {platformMeta?.category}
-                  </CardDescription>
+                  <CardDescription className="capitalize">{platformMeta?.category}</CardDescription>
                 </div>
                 <Switch
                   checked={s.enabled}

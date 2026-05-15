@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Keyboard } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const SHORTCUTS: { keys: string[]; action: string; section: string }[] = [
@@ -30,7 +36,9 @@ export function ShortcutsHelp() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
         const target = e.target as HTMLElement | null;
-        const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        const isTyping =
+          target &&
+          (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
         if (isTyping) return;
         e.preventDefault();
         setOpen(true);
@@ -38,7 +46,9 @@ export function ShortcutsHelp() {
       // G-then-letter chord navigation
       if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey) {
         const target = e.target as HTMLElement | null;
-        const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        const isTyping =
+          target &&
+          (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
         if (isTyping) return;
         lastG = Date.now();
         return;
@@ -81,17 +91,23 @@ export function ShortcutsHelp() {
             <Keyboard className="h-4 w-4" /> Keyboard shortcuts
           </DialogTitle>
           <DialogDescription>
-            Press <kbd className="rounded border border-slate-700 bg-slate-800 px-1 text-[10px]">?</kbd> anywhere to
-            see this list.
+            Press{" "}
+            <kbd className="rounded border border-slate-700 bg-slate-800 px-1 text-[10px]">?</kbd>{" "}
+            anywhere to see this list.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {Object.entries(grouped).map(([section, items]) => (
             <div key={section}>
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{section}</div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {section}
+              </div>
               <ul className="space-y-1">
                 {items.map((s) => (
-                  <li key={s.action} className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-950/40 px-2 py-1.5 text-xs">
+                  <li
+                    key={s.action}
+                    className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-950/40 px-2 py-1.5 text-xs"
+                  >
                     <span className="text-slate-200">{s.action}</span>
                     <span className="flex items-center gap-1">
                       {s.keys.map((k) => (

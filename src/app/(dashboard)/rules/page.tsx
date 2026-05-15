@@ -35,12 +35,8 @@ interface FeedbackPattern {
 
 export default function RulesPage() {
   // Initial fetch + refetch on demand.
-  const { data: rulesData, refetch: refetchRules } = useApi<{ rules: GoldenRule[] }>(
-    "/api/rules",
-  );
-  const { data: patternsData } = useApi<{ patterns: FeedbackPattern[] }>(
-    "/api/rules/suggestions",
-  );
+  const { data: rulesData, refetch: refetchRules } = useApi<{ rules: GoldenRule[] }>("/api/rules");
+  const { data: patternsData } = useApi<{ patterns: FeedbackPattern[] }>("/api/rules/suggestions");
 
   // Local optimistic state — flips immediately on toggle, then API patches in
   // the background. Falls back to the server value on refetch.
@@ -122,7 +118,7 @@ export default function RulesPage() {
                         {r.ruleType}
                       </Badge>
                       <span className="text-sm font-medium">{r.label}</span>
-                      <Badge variant="outline" className="text-[10px] font-mono">
+                      <Badge variant="outline" className="font-mono text-[10px]">
                         w {r.weight}
                       </Badge>
                       {r.niche ? (
@@ -184,7 +180,7 @@ export default function RulesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-200">{p.label}</span>
-                    <Badge variant="violet" className="text-[10px] font-mono">
+                    <Badge variant="violet" className="font-mono text-[10px]">
                       {(p.confidence * 100).toFixed(0)}%
                     </Badge>
                   </div>
@@ -206,7 +202,10 @@ export default function RulesPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Input placeholder="Label…" className="h-8 border-slate-800 bg-slate-950" />
-              <Input placeholder="Keywords (comma)…" className="h-8 border-slate-800 bg-slate-950" />
+              <Input
+                placeholder="Keywords (comma)…"
+                className="h-8 border-slate-800 bg-slate-950"
+              />
               <Button
                 size="sm"
                 className="w-full"

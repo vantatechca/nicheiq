@@ -149,7 +149,10 @@ export function selectModel({ tier }: { tier: AiTier; task?: string }): AiClient
           { signal: opts.signal },
         );
         return {
-          text: res.content.filter(isTextBlock).map((c) => c.text).join(""),
+          text: res.content
+            .filter(isTextBlock)
+            .map((c) => c.text)
+            .join(""),
           usage: toAiUsage(res.usage),
         };
       },

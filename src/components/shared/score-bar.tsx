@@ -20,7 +20,9 @@ export function ScoreBar({ breakdown }: Props) {
               </span>
             </div>
             <Progress value={dim.value} className="h-1.5 bg-slate-800" />
-            {dim.rationale ? <div className="mt-1 text-[10px] text-slate-500">{dim.rationale}</div> : null}
+            {dim.rationale ? (
+              <div className="mt-1 text-[10px] text-slate-500">{dim.rationale}</div>
+            ) : null}
           </div>
         );
       })}

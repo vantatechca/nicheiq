@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   if (platform)
     conditions.push(
-      eq(creators.sourcePlatform, platform as typeof creators.sourcePlatform.enumValues[number]),
+      eq(creators.sourcePlatform, platform as (typeof creators.sourcePlatform.enumValues)[number]),
     );
   if (q) {
     const needle = `%${q}%`;

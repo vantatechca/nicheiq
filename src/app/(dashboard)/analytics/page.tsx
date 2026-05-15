@@ -107,7 +107,7 @@ export default function AnalyticsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-300">{b.label}</span>
-                    <Badge variant="outline" className="text-[10px] font-mono">
+                    <Badge variant="outline" className="font-mono text-[10px]">
                       {b.min}–{b.max}
                     </Badge>
                   </div>

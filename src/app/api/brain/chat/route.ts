@@ -66,7 +66,10 @@ const cannedByMode: Record<BrainMode, string[]> = {
   ],
 };
 
-async function streamCannedResponse(message: string, mode: BrainMode): Promise<ReadableStream<Uint8Array>> {
+async function streamCannedResponse(
+  message: string,
+  mode: BrainMode,
+): Promise<ReadableStream<Uint8Array>> {
   const lines = cannedByMode[mode] ?? cannedByMode.global;
   const acknowledged = `Got it — you said: "${message.slice(0, 160)}${message.length > 160 ? "…" : ""}"\n\n`;
   const fullText = acknowledged + lines.join("");
@@ -199,9 +202,12 @@ export async function POST(req: NextRequest) {
   }
   const parsed = brainMessageSchema.safeParse(body);
   if (!parsed.success) {
-    return new Response(JSON.stringify({ error: "Invalid body", details: parsed.error.flatten() }), {
-      status: 400,
-    });
+    return new Response(
+      JSON.stringify({ error: "Invalid body", details: parsed.error.flatten() }),
+      {
+        status: 400,
+      },
+    );
   }
 
   const useReal = process.env.USE_MOCK === "false" && !!process.env.ANTHROPIC_API_KEY;

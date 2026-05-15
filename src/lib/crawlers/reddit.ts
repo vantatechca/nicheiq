@@ -1,6 +1,5 @@
 import type { CrawlerModule, RawSignal } from "./types";
 
-
 const DEFAULT_SUBS = [
   // Existing good ones
   "Entrepreneur",

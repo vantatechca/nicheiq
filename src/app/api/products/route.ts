@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
   const conditions: SQL[] = [];
 
   if (niche)
-    conditions.push(eq(products.niche, niche as typeof products.niche.enumValues[number]));
+    conditions.push(eq(products.niche, niche as (typeof products.niche.enumValues)[number]));
   if (platform)
     conditions.push(
-      eq(products.sourcePlatform, platform as typeof products.sourcePlatform.enumValues[number]),
+      eq(products.sourcePlatform, platform as (typeof products.sourcePlatform.enumValues)[number]),
     );
   if (q) conditions.push(ilike(products.title, `%${q}%`));
 

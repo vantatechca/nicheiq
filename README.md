@@ -18,35 +18,35 @@ The dashboard, opportunities, products, creators, niches, trends, sources, rules
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 14 App Router · TypeScript strict |
-| Styling | Tailwind CSS · shadcn/ui · Recharts · lucide-react |
-| Data | Drizzle ORM · Neon Postgres · pgvector |
-| Auth | NextAuth v4 (Credentials + JWT, max 4 seats) |
-| Cache + RL | Upstash Redis · @upstash/ratelimit |
-| Jobs | Inngest (durable cron + event functions) |
-| Real-time | SSE on Node runtime |
-| AI tiers | Tier 1 OpenRouter (Qwen) · Tier 2 Claude Haiku · Tier 3 Claude Sonnet |
-| Email | Resend (optional) |
-| Tests | Vitest (unit) · Playwright (one happy-path E2E) |
+| Layer      | Choice                                                                |
+| ---------- | --------------------------------------------------------------------- |
+| Framework  | Next.js 14 App Router · TypeScript strict                             |
+| Styling    | Tailwind CSS · shadcn/ui · Recharts · lucide-react                    |
+| Data       | Drizzle ORM · Neon Postgres · pgvector                                |
+| Auth       | NextAuth v4 (Credentials + JWT, max 4 seats)                          |
+| Cache + RL | Upstash Redis · @upstash/ratelimit                                    |
+| Jobs       | Inngest (durable cron + event functions)                              |
+| Real-time  | SSE on Node runtime                                                   |
+| AI tiers   | Tier 1 OpenRouter (Qwen) · Tier 2 Claude Haiku · Tier 3 Claude Sonnet |
+| Email      | Resend (optional)                                                     |
+| Tests      | Vitest (unit) · Playwright (one happy-path E2E)                       |
 
 ## Build phases
 
 The repo was assembled in 10 phases, each on a single feature branch. Every phase commit is in `git log`.
 
-| Phase | Focus | Key paths |
-|---|---|---|
-| A | Foundation | `package.json`, `tsconfig.json`, `tailwind.config.ts`, `components/ui/*` (31 shadcn primitives) |
-| B | Schema + mocks | `src/lib/db/schema.ts`, `drizzle/0000_initial.sql`, `src/mock/data.ts` |
-| C | Auth + layout | `src/lib/auth/options.ts`, `src/middleware.ts`, `src/components/layout/*` |
-| D | Pages | 18 routes under `src/app/(dashboard)/*` |
-| E | API | ~50 routes under `src/app/api/*`, including SSE feed |
-| F | Scoring | `src/lib/scoring/{engine,golden-rules,feedback-patterns}.ts` + Vitest |
-| G | Brain | `src/lib/ai/{client,context-assembler,prompts}` + streaming chat |
-| H | DB + Inngest | `src/inngest/{client,functions/*}`, `src/lib/redis/client.ts` |
-| I | Crawlers | `src/lib/crawlers/{reddit,hacker-news,product-hunt,envato,kaggle}.ts` |
-| J | Polish | Recharts, theme toggle, Playwright E2E, this README |
+| Phase | Focus          | Key paths                                                                                       |
+| ----- | -------------- | ----------------------------------------------------------------------------------------------- |
+| A     | Foundation     | `package.json`, `tsconfig.json`, `tailwind.config.ts`, `components/ui/*` (31 shadcn primitives) |
+| B     | Schema + mocks | `src/lib/db/schema.ts`, `drizzle/0000_initial.sql`, `src/mock/data.ts`                          |
+| C     | Auth + layout  | `src/lib/auth/options.ts`, `src/middleware.ts`, `src/components/layout/*`                       |
+| D     | Pages          | 18 routes under `src/app/(dashboard)/*`                                                         |
+| E     | API            | ~50 routes under `src/app/api/*`, including SSE feed                                            |
+| F     | Scoring        | `src/lib/scoring/{engine,golden-rules,feedback-patterns}.ts` + Vitest                           |
+| G     | Brain          | `src/lib/ai/{client,context-assembler,prompts}` + streaming chat                                |
+| H     | DB + Inngest   | `src/inngest/{client,functions/*}`, `src/lib/redis/client.ts`                                   |
+| I     | Crawlers       | `src/lib/crawlers/{reddit,hacker-news,product-hunt,envato,kaggle}.ts`                           |
+| J     | Polish         | Recharts, theme toggle, Playwright E2E, this README                                             |
 
 ## Environment
 
@@ -55,6 +55,7 @@ See `.env.local.example` for the full list. Minimum to run in mock mode is just 
 ## Mock vs live
 
 Set `USE_MOCK=true` (default) to run the entire app against `src/mock/data.ts` — no DB, no AI keys, no crawler endpoints required. Flip to `USE_MOCK=false` to:
+
 - route auth through Drizzle/Neon (`DATABASE_URL` required)
 - stream real Anthropic responses on `POST /api/brain/chat` (`ANTHROPIC_API_KEY` required)
 - run Inngest jobs against the real Postgres
@@ -70,7 +71,8 @@ const tier3 = selectModel({ tier: 3 });
 for await (const chunk of tier3.stream({
   system: assembleContext({ mode: "global", refIds: {}, userId }),
   messages: [{ role: "user", content: "What should I build?" }],
-})) process.stdout.write(chunk);
+}))
+  process.stdout.write(chunk);
 ```
 
 A daily spend cap (`AI_DAILY_SPEND_CAP`) is enforced via Upstash. Tier-3 calls refuse above the cap.

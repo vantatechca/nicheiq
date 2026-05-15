@@ -135,7 +135,9 @@ export function ProductsView({ products, total, filters }: Props) {
                 </div>
                 <div className="mt-1 line-clamp-1 text-xs text-slate-500">{p.creator}</div>
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-emerald-400">{formatUsd(p.priceUsd ?? 0)}</span>
+                  <span className="font-semibold text-emerald-400">
+                    {formatUsd(p.priceUsd ?? 0)}
+                  </span>
                   <span className="flex items-center gap-1 text-slate-400">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     {p.ratingAvg?.toFixed(1)} · {formatNumber(p.ratingCount, { compact: true })}

@@ -67,9 +67,7 @@ function CompareView() {
 
   const slots = [slot1, slot2, slot3, slot4];
   const loading = slots.some((s, i) => ids[i] && s.loading);
-  const opps = slots
-    .map((s) => s.data?.opportunity)
-    .filter((o): o is Opportunity => !!o);
+  const opps = slots.map((s) => s.data?.opportunity).filter((o): o is Opportunity => !!o);
 
   if (loading && opps.length === 0) {
     return <div className="p-4 text-sm text-slate-500">Loading opportunities...</div>;
@@ -131,7 +129,7 @@ function CompareView() {
                   {o.status}
                 </Badge>
               </div>
-              <CardTitle className="line-clamp-2 mt-2 text-base">{o.title}</CardTitle>
+              <CardTitle className="mt-2 line-clamp-2 text-base">{o.title}</CardTitle>
               <p className="line-clamp-3 text-xs text-slate-400">{o.summary}</p>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -219,20 +217,14 @@ function CompareView() {
   );
 }
 
-function Cell({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
+function Cell({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="rounded-md border border-slate-800 bg-slate-950/40 p-2">
       <div className="text-[10px] uppercase text-slate-500">{label}</div>
       <div
-        className={"mt-0.5 text-sm " + (highlight ? "font-semibold text-emerald-400" : "text-slate-200")}
+        className={
+          "mt-0.5 text-sm " + (highlight ? "font-semibold text-emerald-400" : "text-slate-200")
+        }
       >
         {value}
       </div>

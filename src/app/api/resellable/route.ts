@@ -16,10 +16,7 @@ export async function GET(req: NextRequest) {
   const conditions: SQL[] = [];
   if (status)
     conditions.push(
-      eq(
-        resellableAssets.status,
-        status as typeof resellableAssets.status.enumValues[number],
-      ),
+      eq(resellableAssets.status, status as (typeof resellableAssets.status.enumValues)[number]),
     );
 
   const rows = await db
@@ -49,11 +46,10 @@ export async function POST(req: NextRequest) {
     .insert(resellableAssets)
     .values({
       id: `asset_user_${Date.now()}`,
-      sourcePlatform:
-        parsed.data.sourcePlatform as typeof resellableAssets.sourcePlatform.enumValues[number],
+      sourcePlatform: parsed.data
+        .sourcePlatform as (typeof resellableAssets.sourcePlatform.enumValues)[number],
       sourceUrl: parsed.data.sourceUrl,
-      assetType:
-        parsed.data.assetType as typeof resellableAssets.assetType.enumValues[number],
+      assetType: parsed.data.assetType as (typeof resellableAssets.assetType.enumValues)[number],
       title: parsed.data.title,
       askingPriceUsd: parsed.data.askingPriceUsd,
     })

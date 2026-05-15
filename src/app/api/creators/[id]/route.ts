@@ -10,11 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!session) return unauthorized();
 
   const db = getDb();
-  const [creator] = await db
-    .select()
-    .from(creators)
-    .where(eq(creators.id, params.id))
-    .limit(1);
+  const [creator] = await db.select().from(creators).where(eq(creators.id, params.id)).limit(1);
 
   if (!creator) return notFound("Creator not found");
   return ok({ creator });

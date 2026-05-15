@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       description: parsed.data.description ?? "",
       ruleType: parsed.data.ruleType,
       niche: parsed.data.niche
-        ? (parsed.data.niche as typeof goldenRules.niche.enumValues[number])
+        ? (parsed.data.niche as (typeof goldenRules.niche.enumValues)[number])
         : null,
       keywords: parsed.data.keywords,
       weight: parsed.data.weight,

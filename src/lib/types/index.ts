@@ -6,7 +6,13 @@ export type ScoreDimensionKey = "demand" | "competition" | "revenue" | "buildEff
 
 export type ScoreBreakdown = {
   dimensions: Record<ScoreDimensionKey, { value: number; weight: number; rationale?: string }>;
-  ruleModifiers: { ruleId: string; label: string; ruleType: string; delta: number; matched: string[] }[];
+  ruleModifiers: {
+    ruleId: string;
+    label: string;
+    ruleType: string;
+    delta: number;
+    matched: string[];
+  }[];
   patternModifiers: { patternId: string; label: string; delta: number }[];
   finalScore: number;
   computedAt: string;

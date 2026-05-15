@@ -12,11 +12,11 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const niche      = searchParams.get("niche");
-  const minScore   = Number(searchParams.get("minScore") ?? 65);
-  const limit      = Number(searchParams.get("limit") ?? 100);
+  const niche = searchParams.get("niche");
+  const minScore = Number(searchParams.get("minScore") ?? 65);
+  const limit = Number(searchParams.get("limit") ?? 100);
   const excludeRaw = searchParams.get("exclude") ?? "";
-  const exclude    = excludeRaw ? excludeRaw.split(",") : [];
+  const exclude = excludeRaw ? excludeRaw.split(",") : [];
 
   const conditions: SQL[] = [gte(opportunities.score, minScore)];
   if (niche) conditions.push(eq(opportunities.niche, niche as any));
@@ -30,9 +30,7 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(opportunities.createdAt))
     .limit(limit + exclude.length);
 
-  rows = rows
-    .filter((r) => !exclude.includes(r.id))
-    .slice(0, limit);
+  rows = rows.filter((r) => !exclude.includes(r.id)).slice(0, limit);
 
   return NextResponse.json({ opportunities: rows });
 }

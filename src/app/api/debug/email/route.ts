@@ -24,14 +24,19 @@ export async function GET(req: NextRequest) {
     RESEND_API_KEY_set: !!apiKey,
     RESEND_API_KEY_prefix: apiKey ? apiKey.slice(0, 6) : null,
     RESEND_API_KEY_length: apiKey?.length ?? 0,
-    DIGEST_EMAIL_TO: process.env.DIGEST_EMAIL_TO ?? "(unset, will default to vantatechca@gmail.com)",
-    DIGEST_EMAIL_FROM: process.env.DIGEST_EMAIL_FROM ?? "(unset, will default to NicheIQ <onboarding@resend.dev>)",
+    DIGEST_EMAIL_TO:
+      process.env.DIGEST_EMAIL_TO ?? "(unset, will default to vantatechca@gmail.com)",
+    DIGEST_EMAIL_FROM:
+      process.env.DIGEST_EMAIL_FROM ?? "(unset, will default to NicheIQ <onboarding@resend.dev>)",
     NODE_VERSION: process.version,
     NODE_ENV: process.env.NODE_ENV,
   };
 
   if (!apiKey) {
-    return NextResponse.json({ env, result: { sent: false, reason: "RESEND_API_KEY missing in env" } });
+    return NextResponse.json({
+      env,
+      result: { sent: false, reason: "RESEND_API_KEY missing in env" },
+    });
   }
 
   const to = (process.env.DIGEST_EMAIL_TO ?? "vantatechca@gmail.com")

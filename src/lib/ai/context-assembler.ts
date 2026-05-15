@@ -51,7 +51,10 @@ function fitToBudget(text: string, tokenBudget: number) {
 function rulesBlock() {
   const active = mockGoldenRules.filter((r) => r.active).slice(0, MAX_RULES);
   return active
-    .map((r) => `- [${r.ruleType.toUpperCase()} w=${r.weight}] ${r.label}: ${r.keywords.join(", ") || "(no kw)"}`)
+    .map(
+      (r) =>
+        `- [${r.ruleType.toUpperCase()} w=${r.weight}] ${r.label}: ${r.keywords.join(", ") || "(no kw)"}`,
+    )
     .join("\n");
 }
 

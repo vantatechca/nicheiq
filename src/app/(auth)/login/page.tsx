@@ -13,7 +13,11 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/utils/constants";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );
@@ -65,8 +69,8 @@ function LoginForm() {
               selling. Build it next.
             </h1>
             <p className="mt-6 max-w-md text-base text-slate-400">
-              {APP_TAGLINE}. Real-time signals across Etsy, Gumroad, Notion, KDP, Kaggle, Flippa & 30 more sources, scored
-              for build effort, demand, and revenue.
+              {APP_TAGLINE}. Real-time signals across Etsy, Gumroad, Notion, KDP, Kaggle, Flippa &
+              30 more sources, scored for build effort, demand, and revenue.
             </p>
             <div className="mt-10 grid grid-cols-3 gap-6 text-sm text-slate-400">
               <div>

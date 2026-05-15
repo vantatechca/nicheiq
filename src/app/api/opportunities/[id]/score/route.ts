@@ -34,10 +34,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const avgGrowth = Number(trendRow?.avgGrowth ?? 0);
 
   // Fetch active rules + patterns
-  const rules = await db
-    .select()
-    .from(goldenRules)
-    .where(eq(goldenRules.active, true));
+  const rules = await db.select().from(goldenRules).where(eq(goldenRules.active, true));
   const patterns = await db.select().from(feedbackPatterns);
 
   // Compute dimensions

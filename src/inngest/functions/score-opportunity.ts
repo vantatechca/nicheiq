@@ -30,10 +30,7 @@ export const scoreOpportunity = inngest.createFunction(
         .where(eq(trends.niche, opp.niche));
       const avgGrowth = Number(trendRow?.avgGrowth ?? 0);
 
-      const rules = await db
-        .select()
-        .from(goldenRules)
-        .where(eq(goldenRules.active, true));
+      const rules = await db.select().from(goldenRules).where(eq(goldenRules.active, true));
       const patterns = await db.select().from(feedbackPatterns);
 
       const dimensions = dimensionsFromHeuristics({

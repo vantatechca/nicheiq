@@ -10,11 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!session) return unauthorized();
 
   const db = getDb();
-  const [product] = await db
-    .select()
-    .from(products)
-    .where(eq(products.id, params.id))
-    .limit(1);
+  const [product] = await db.select().from(products).where(eq(products.id, params.id)).limit(1);
 
   if (!product) return notFound("Product not found");
   return ok({ product });

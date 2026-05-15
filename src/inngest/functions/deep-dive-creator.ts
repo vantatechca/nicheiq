@@ -13,11 +13,7 @@ export const deepDiveCreator = inngest.createFunction(
     const result = await step.run("analyze-and-persist", async () => {
       const db = getDb();
 
-      const [creator] = await db
-        .select()
-        .from(creators)
-        .where(eq(creators.id, creatorId))
-        .limit(1);
+      const [creator] = await db.select().from(creators).where(eq(creators.id, creatorId)).limit(1);
       if (!creator) throw new Error(`Creator ${creatorId} not found`);
 
       const creatorProducts = await db
@@ -60,7 +56,10 @@ Output their playbook as JSON:
 
       let playbook = {};
       try {
-        const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+        const cleaned = text
+          .replace(/^```json\s*/i, "")
+          .replace(/```\s*$/, "")
+          .trim();
         playbook = JSON.parse(cleaned);
       } catch {
         playbook = { signatureStyle: text.slice(0, 500) };

@@ -10,14 +10,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { RechartsLine } from "@/components/shared/recharts-line";
 import { getDb } from "@/lib/db/client";
-import {
-  opportunities,
-  niches,
-  trends,
-  activityLog,
-  signals,
-  users,
-} from "@/lib/db/schema";
+import { opportunities, niches, trends, activityLog, signals, users } from "@/lib/db/schema";
 import { formatUsd, formatPct, timeAgo, formatNumber } from "@/lib/utils/format";
 import { ACTIVITY_ICONS } from "@/lib/utils/constants";
 
@@ -43,18 +36,10 @@ export default async function DashboardPage() {
     scoreSparkline,
   ] = await Promise.all([
     // Top 5 opportunities by score
-    db
-      .select()
-      .from(opportunities)
-      .orderBy(desc(opportunities.score))
-      .limit(5),
+    db.select().from(opportunities).orderBy(desc(opportunities.score)).limit(5),
 
     // Top 4 trends by growth
-    db
-      .select()
-      .from(trends)
-      .orderBy(desc(trends.growthPct))
-      .limit(4),
+    db.select().from(trends).orderBy(desc(trends.growthPct)).limit(4),
 
     // Latest 8 activity entries, LEFT JOIN users to get display name.
     // LEFT (not INNER) so activity from deleted/null users still shows.
@@ -74,11 +59,7 @@ export default async function DashboardPage() {
       .limit(8),
 
     // Latest 5 signals
-    db
-      .select()
-      .from(signals)
-      .orderBy(desc(signals.processedAt))
-      .limit(5),
+    db.select().from(signals).orderBy(desc(signals.processedAt)).limit(5),
 
     // All niches — we'll rank them by avg trend momentum in JS since
     // niches.momentumScore doesn't exist in the real schema.
@@ -316,7 +297,10 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {liveSignalsRows.map((s) => (
-              <div key={s.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-2 text-xs">
+              <div
+                key={s.id}
+                className="rounded-md border border-slate-800 bg-slate-950/40 p-2 text-xs"
+              >
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="text-[10px] uppercase">
                     {s.signalType.replace(/_/g, " ")}
@@ -349,10 +333,13 @@ export default async function DashboardPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-slate-300">
-                        <span className="font-medium">{a.userName ?? a.userId}</span> {a.action.replace(/_/g, " ")} ·{" "}
+                        <span className="font-medium">{a.userName ?? a.userId}</span>{" "}
+                        {a.action.replace(/_/g, " ")} ·{" "}
                         <span className="text-slate-500">{a.entityType}</span>
                       </div>
-                      <div className="text-[10px] text-slate-500">{timeAgo(a.createdAt.toString())}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {timeAgo(a.createdAt.toString())}
+                      </div>
                     </div>
                   </li>
                 );
@@ -376,7 +363,9 @@ export default async function DashboardPage() {
               >
                 <div className="text-[10px] uppercase text-slate-500">{t.geo}</div>
                 <div className="truncate text-xs text-slate-300">{t.keyword}</div>
-                <div className="text-sm font-semibold">{formatNumber(t.volume7d, { compact: true })}</div>
+                <div className="text-sm font-semibold">
+                  {formatNumber(t.volume7d, { compact: true })}
+                </div>
               </div>
             ))}
           </div>

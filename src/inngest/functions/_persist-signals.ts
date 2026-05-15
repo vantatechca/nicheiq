@@ -12,27 +12,58 @@ type SignalType =
   | "expired_listing";
 
 type NicheValue =
-  | "print_on_demand" | "etsy_printable" | "notion_template" | "gumroad_ebook"
-  | "kdp_low_content" | "course" | "ai_prompt_pack" | "figma_kit"
-  | "wordpress_theme" | "shopify_app" | "lightroom_preset" | "sample_pack"
-  | "video_template" | "dataset" | "plr_pack" | "micro_saas"
-  | "browser_extension" | "discord_bot" | "game_asset" | "other";
+  | "print_on_demand"
+  | "etsy_printable"
+  | "notion_template"
+  | "gumroad_ebook"
+  | "kdp_low_content"
+  | "course"
+  | "ai_prompt_pack"
+  | "figma_kit"
+  | "wordpress_theme"
+  | "shopify_app"
+  | "lightroom_preset"
+  | "sample_pack"
+  | "video_template"
+  | "dataset"
+  | "plr_pack"
+  | "micro_saas"
+  | "browser_extension"
+  | "discord_bot"
+  | "game_asset"
+  | "other";
 
 const VALID_NICHES = new Set<NicheValue>([
-  "print_on_demand", "etsy_printable", "notion_template", "gumroad_ebook",
-  "kdp_low_content", "course", "ai_prompt_pack", "figma_kit", "wordpress_theme",
-  "shopify_app", "lightroom_preset", "sample_pack", "video_template", "dataset",
-  "plr_pack", "micro_saas", "browser_extension", "discord_bot", "game_asset", "other",
+  "print_on_demand",
+  "etsy_printable",
+  "notion_template",
+  "gumroad_ebook",
+  "kdp_low_content",
+  "course",
+  "ai_prompt_pack",
+  "figma_kit",
+  "wordpress_theme",
+  "shopify_app",
+  "lightroom_preset",
+  "sample_pack",
+  "video_template",
+  "dataset",
+  "plr_pack",
+  "micro_saas",
+  "browser_extension",
+  "discord_bot",
+  "game_asset",
+  "other",
 ]);
 
 const SIGNAL_TYPE: Record<string, SignalType> = {
-  reddit:        "social_mention",
-  hacker_news:   "social_mention",
-  product_hunt:  "launch",
-  etsy:          "marketplace_listing",
-  envato:        "marketplace_listing",
-  kaggle:        "dataset_drop",
-  flippa:        "expired_listing",
+  reddit: "social_mention",
+  hacker_news: "social_mention",
+  product_hunt: "launch",
+  etsy: "marketplace_listing",
+  envato: "marketplace_listing",
+  kaggle: "dataset_drop",
+  flippa: "expired_listing",
 };
 
 function safeNiche(v: string): NicheValue {
@@ -48,27 +79,27 @@ async function classifyNiches(
 
   // Subreddit → niche direct mapping (no AI needed for these)
   const subredditMap: Record<string, NicheValue> = {
-    "Notion":              "notion_template",
-    "NotionTemplates":     "notion_template",
-    "EtsySellers":         "etsy_printable",
-    "Etsy":                "etsy_printable",
-    "KDP":                 "kdp_low_content",
-    "selfpublishing":      "kdp_low_content",
-    "lightroom":           "lightroom_preset",
-    "gamedev":             "game_asset",
-    "gamedesign":          "game_asset",
-    "discordapp":          "discord_bot",
-    "WordpressPlugins":    "wordpress_theme",
-    "shopify":             "shopify_app",
-    "VideoEditing":        "video_template",
-    "datasets":            "dataset",
-    "ChatGPT":             "ai_prompt_pack",
-    "MidJourney":          "ai_prompt_pack",
-    "AIPromptEngineering": "ai_prompt_pack",
-    "NoCode":              "micro_saas",
-    "nocode":              "micro_saas",
-    "microsaas":           "micro_saas",
-    "SaaS":                "micro_saas",
+    Notion: "notion_template",
+    NotionTemplates: "notion_template",
+    EtsySellers: "etsy_printable",
+    Etsy: "etsy_printable",
+    KDP: "kdp_low_content",
+    selfpublishing: "kdp_low_content",
+    lightroom: "lightroom_preset",
+    gamedev: "game_asset",
+    gamedesign: "game_asset",
+    discordapp: "discord_bot",
+    WordpressPlugins: "wordpress_theme",
+    shopify: "shopify_app",
+    VideoEditing: "video_template",
+    datasets: "dataset",
+    ChatGPT: "ai_prompt_pack",
+    MidJourney: "ai_prompt_pack",
+    AIPromptEngineering: "ai_prompt_pack",
+    NoCode: "micro_saas",
+    nocode: "micro_saas",
+    microsaas: "micro_saas",
+    SaaS: "micro_saas",
   };
 
   try {
@@ -101,7 +132,10 @@ Output ONLY a JSON array of strings, one per item, in the same order. No explana
       temperature: 0,
     });
 
-    const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const cleaned = text
+      .replace(/^```json\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
     const parsed = JSON.parse(cleaned) as string[];
 
     if (!Array.isArray(parsed) || parsed.length !== items.length) {
@@ -129,13 +163,13 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
 
   // Classify niches in one batch call (Tier 1 — cheap + fast)
   const niches = await classifyNiches(
-  normalized.map((s) => ({
-    title: s.title,
-    snippet: s.snippet,
-    tags: s.tags,
-    platform: s.sourcePlatform,
-  })),
-);
+    normalized.map((s) => ({
+      title: s.title,
+      snippet: s.snippet,
+      tags: s.tags,
+      platform: s.sourcePlatform,
+    })),
+  );
 
   const rows = normalized.map((s, i) => ({
     id: crypto.randomUUID(),
@@ -147,24 +181,25 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
     title: s.title,
     snippet: s.snippet ?? "",
     engagement: {
-      priceUsd:     s.priceUsd ?? null,
-      ratingAvg:    s.ratingAvg ?? null,
-      ratingCount:  s.ratingCount ?? null,
-      tags:         s.tags ?? [],
-      creator:      s.creator ?? null,
-      rawScore:     (s.rawJson as any)?.score
-                    ?? (s.rawJson as any)?.votesCount
-                    ?? (s.rawJson as any)?.num_favorers
-                    ?? 0,
+      priceUsd: s.priceUsd ?? null,
+      ratingAvg: s.ratingAvg ?? null,
+      ratingCount: s.ratingCount ?? null,
+      tags: s.tags ?? [],
+      creator: s.creator ?? null,
+      rawScore:
+        (s.rawJson as any)?.score ??
+        (s.rawJson as any)?.votesCount ??
+        (s.rawJson as any)?.num_favorers ??
+        0,
     },
     score: Math.min(
       100,
       Math.log10(
         1 +
-        ((s.rawJson as any)?.score ?? 0) +
-        ((s.rawJson as any)?.votesCount ?? 0) * 3 +
-        ((s.rawJson as any)?.num_favorers ?? 0) +
-        ((s.rawJson as any)?.num_comments ?? 0) * 0.5,
+          ((s.rawJson as any)?.score ?? 0) +
+          ((s.rawJson as any)?.votesCount ?? 0) * 3 +
+          ((s.rawJson as any)?.num_favorers ?? 0) +
+          ((s.rawJson as any)?.num_comments ?? 0) * 0.5,
       ) * 20,
     ),
     processedAt: new Date(),
@@ -185,11 +220,11 @@ export async function persistSignals(normalized: RawSignal[]): Promise<number> {
     .onConflictDoUpdate({
       target: [signals.sourcePlatform, signals.sourceId],
       set: {
-        title:       sql`excluded.title`,
-        snippet:     sql`excluded.snippet`,
-        engagement:  sql`excluded.engagement`,
-        score:       sql`excluded.score`,
-        niche:       sql`excluded.niche`,
+        title: sql`excluded.title`,
+        snippet: sql`excluded.snippet`,
+        engagement: sql`excluded.engagement`,
+        score: sql`excluded.score`,
+        niche: sql`excluded.niche`,
         processedAt: sql`excluded.processed_at`,
       },
     });

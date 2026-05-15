@@ -9,9 +9,7 @@ type Cadence = "daily" | "weekly";
 
 async function buildAndPersistDigest(cadence: Cadence) {
   const db = getDb();
-  const windowMs = cadence === "daily"
-    ? 24 * 60 * 60 * 1000
-    : 7 * 24 * 60 * 60 * 1000;
+  const windowMs = cadence === "daily" ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
   const since = new Date(Date.now() - windowMs);
 
   // Top opportunities

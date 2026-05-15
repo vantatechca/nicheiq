@@ -20,25 +20,32 @@ export async function GET(req: NextRequest) {
   // because Drizzle's column refs carry their pg types.
   const conditions: SQL[] = [];
   if (q.niche)
-    conditions.push(eq(opportunities.niche, q.niche as typeof opportunities.niche.enumValues[number]));
+    conditions.push(
+      eq(opportunities.niche, q.niche as (typeof opportunities.niche.enumValues)[number]),
+    );
   if (q.status)
-    conditions.push(eq(opportunities.status, q.status as typeof opportunities.status.enumValues[number]));
+    conditions.push(
+      eq(opportunities.status, q.status as (typeof opportunities.status.enumValues)[number]),
+    );
   if (q.type)
     conditions.push(
-      eq(opportunities.opportunityType, q.type as typeof opportunities.opportunityType.enumValues[number]),
+      eq(
+        opportunities.opportunityType,
+        q.type as (typeof opportunities.opportunityType.enumValues)[number],
+      ),
     );
   if (q.buildEffort)
     conditions.push(
-      eq(opportunities.buildEffort, q.buildEffort as typeof opportunities.buildEffort.enumValues[number]),
+      eq(
+        opportunities.buildEffort,
+        q.buildEffort as (typeof opportunities.buildEffort.enumValues)[number],
+      ),
     );
   if (q.minScore != null) conditions.push(gte(opportunities.score, q.minScore));
   if (q.maxScore != null) conditions.push(lte(opportunities.score, q.maxScore));
   if (q.q) {
     const needle = `%${q.q}%`;
-    const textMatch = or(
-      ilike(opportunities.title, needle),
-      ilike(opportunities.summary, needle),
-    );
+    const textMatch = or(ilike(opportunities.title, needle), ilike(opportunities.summary, needle));
     if (textMatch) conditions.push(textMatch);
   }
 
@@ -64,7 +71,8 @@ export async function GET(req: NextRequest) {
   // Sort. Default is score desc (highest opportunities first).
   const orderBy = (() => {
     if (q.sort === "newest") return [desc(opportunities.createdAt), desc(opportunities.id)];
-    if (q.sort === "revenue") return [desc(opportunities.projectedRevenueUsd), desc(opportunities.id)];
+    if (q.sort === "revenue")
+      return [desc(opportunities.projectedRevenueUsd), desc(opportunities.id)];
     return [desc(opportunities.score), desc(opportunities.id)];
   })();
 
@@ -115,9 +123,10 @@ export async function POST(req: NextRequest) {
       id: `opportunity_user_${Date.now()}`,
       title: parsed.data.title,
       summary: parsed.data.summary,
-      niche: parsed.data.niche as typeof opportunities.niche.enumValues[number],
-      opportunityType: parsed.data.opportunityType as typeof opportunities.opportunityType.enumValues[number],
-      buildEffort: parsed.data.buildEffort as typeof opportunities.buildEffort.enumValues[number],
+      niche: parsed.data.niche as (typeof opportunities.niche.enumValues)[number],
+      opportunityType: parsed.data
+        .opportunityType as (typeof opportunities.opportunityType.enumValues)[number],
+      buildEffort: parsed.data.buildEffort as (typeof opportunities.buildEffort.enumValues)[number],
       projectedRevenueUsd: parsed.data.projectedRevenueUsd ?? 1000,
       status: "tracking",
       sourceProductIds: [],

@@ -22,7 +22,7 @@ export default async function CreatorsPage({ searchParams }: { searchParams: SP 
   const conditions: SQL[] = [];
   if (platform)
     conditions.push(
-      eq(creators.sourcePlatform, platform as typeof creators.sourcePlatform.enumValues[number]),
+      eq(creators.sourcePlatform, platform as (typeof creators.sourcePlatform.enumValues)[number]),
     );
   if (search.trim()) {
     const needle = `%${search.trim()}%`;
@@ -37,18 +37,10 @@ export default async function CreatorsPage({ searchParams }: { searchParams: SP 
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(creators.totalEstRevenueUsd), desc(creators.id))
       .limit(200),
-    db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(creators),
+    db.select({ count: sql<number>`COUNT(*)::int` }).from(creators),
   ]);
 
   const total = totalRow[0]?.count ?? 0;
 
-  return (
-    <CreatorsView
-      creators={rows as never[]}
-      total={total}
-      filters={{ search, platform }}
-    />
-  );
+  return <CreatorsView creators={rows as never[]} total={total} filters={{ search, platform }} />;
 }

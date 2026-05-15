@@ -171,7 +171,10 @@ export default function ResellablePage() {
                 </div>
                 <h3 className="mt-2 text-sm font-medium">{a.title}</h3>
                 <div className="mt-2 grid gap-1 text-xs">
-                  <Row label="Asking" value={a.askingPriceUsd ? formatUsd(a.askingPriceUsd) : "—"} />
+                  <Row
+                    label="Asking"
+                    value={a.askingPriceUsd ? formatUsd(a.askingPriceUsd) : "—"}
+                  />
                   <Row
                     label="Monthly rev"
                     value={a.monthlyRevenueUsd ? formatUsd(a.monthlyRevenueUsd) : "—"}

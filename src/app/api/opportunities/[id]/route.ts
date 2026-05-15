@@ -45,17 +45,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
   if (parsed.data.summary !== undefined) updates.summary = parsed.data.summary;
   if (parsed.data.niche !== undefined)
-    updates.niche = parsed.data.niche as typeof opportunities.niche.enumValues[number];
+    updates.niche = parsed.data.niche as (typeof opportunities.niche.enumValues)[number];
   if (parsed.data.opportunityType !== undefined)
-    updates.opportunityType =
-      parsed.data.opportunityType as typeof opportunities.opportunityType.enumValues[number];
+    updates.opportunityType = parsed.data
+      .opportunityType as (typeof opportunities.opportunityType.enumValues)[number];
   if (parsed.data.buildEffort !== undefined)
-    updates.buildEffort =
-      parsed.data.buildEffort as typeof opportunities.buildEffort.enumValues[number];
+    updates.buildEffort = parsed.data
+      .buildEffort as (typeof opportunities.buildEffort.enumValues)[number];
   if (parsed.data.projectedRevenueUsd !== undefined)
     updates.projectedRevenueUsd = parsed.data.projectedRevenueUsd;
   if (parsed.data.status !== undefined)
-    updates.status = parsed.data.status as typeof opportunities.status.enumValues[number];
+    updates.status = parsed.data.status as (typeof opportunities.status.enumValues)[number];
 
   const [updated] = await db
     .update(opportunities)

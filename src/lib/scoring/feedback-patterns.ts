@@ -16,7 +16,15 @@ export type PatternMatch = {
 const MAX_COMBINED = 10;
 
 export function applyFeedbackPatterns(o: OpportunityShape, patterns: FeedbackPattern[]) {
-  const haystack = (o.title + " " + o.summary + " " + o.niche + " " + o.opportunityType).toLowerCase();
+  const haystack = (
+    o.title +
+    " " +
+    o.summary +
+    " " +
+    o.niche +
+    " " +
+    o.opportunityType
+  ).toLowerCase();
   const matches: PatternMatch[] = [];
   for (const p of patterns) {
     if (p.niche && p.niche !== o.niche) continue;

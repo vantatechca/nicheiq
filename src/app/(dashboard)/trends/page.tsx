@@ -76,10 +76,7 @@ export default function TrendsPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{t.keyword}</CardTitle>
-                <Badge
-                  variant={t.growthPct >= 0 ? "success" : "destructive"}
-                  className="font-mono"
-                >
+                <Badge variant={t.growthPct >= 0 ? "success" : "destructive"} className="font-mono">
                   {formatPct(t.growthPct, { signed: true })}
                 </Badge>
               </div>

@@ -15,7 +15,11 @@ export function getRedis() {
   return _redis;
 }
 
-export function getRateLimiter(opts: { limit: number; window: `${number} s` | `${number} m` | `${number} h`; key: string }) {
+export function getRateLimiter(opts: {
+  limit: number;
+  window: `${number} s` | `${number} m` | `${number} h`;
+  key: string;
+}) {
   const redis = getRedis();
   if (!redis) return null;
   return new Ratelimit({

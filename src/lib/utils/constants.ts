@@ -75,7 +75,12 @@ export const SOURCE_PLATFORMS = [
   { value: "lemonsqueezy", label: "Lemon Squeezy", category: "marketplace", icon: "🍋" },
   { value: "patreon", label: "Patreon", category: "marketplace", icon: "🎭" },
   { value: "skool", label: "Skool", category: "marketplace", icon: "🏛" },
-  { value: "teachers_pay_teachers", label: "Teachers Pay Teachers", category: "marketplace", icon: "🍎" },
+  {
+    value: "teachers_pay_teachers",
+    label: "Teachers Pay Teachers",
+    category: "marketplace",
+    icon: "🍎",
+  },
   { value: "google_trends", label: "Google Trends", category: "trend", icon: "📈" },
   { value: "tiktok", label: "TikTok", category: "trend", icon: "🎵" },
   { value: "pinterest", label: "Pinterest", category: "trend", icon: "📌" },
@@ -126,13 +131,41 @@ export const NICHE_LIST = [
 export type NicheValue = (typeof NICHE_LIST)[number]["value"];
 
 export const OPPORTUNITY_TYPES = [
-  { value: "trend_play", label: "Trend play", description: "Capitalize on a rising query before saturation" },
-  { value: "replication", label: "Replication", description: "Replicate a proven seller with a twist" },
-  { value: "repackage_resell", label: "Repackage & resell", description: "License an asset and rebundle for a niche" },
-  { value: "niche_expansion", label: "Niche expansion", description: "Take a winning concept into an adjacent niche" },
-  { value: "micro_saas", label: "Micro-SaaS", description: "Wrap an API or workflow into a paid tool" },
-  { value: "plr_remix", label: "PLR remix", description: "Use private-label rights content as a base" },
-  { value: "dataset_wrap", label: "Dataset wrap", description: "Package a dataset behind an API or UI" },
+  {
+    value: "trend_play",
+    label: "Trend play",
+    description: "Capitalize on a rising query before saturation",
+  },
+  {
+    value: "replication",
+    label: "Replication",
+    description: "Replicate a proven seller with a twist",
+  },
+  {
+    value: "repackage_resell",
+    label: "Repackage & resell",
+    description: "License an asset and rebundle for a niche",
+  },
+  {
+    value: "niche_expansion",
+    label: "Niche expansion",
+    description: "Take a winning concept into an adjacent niche",
+  },
+  {
+    value: "micro_saas",
+    label: "Micro-SaaS",
+    description: "Wrap an API or workflow into a paid tool",
+  },
+  {
+    value: "plr_remix",
+    label: "PLR remix",
+    description: "Use private-label rights content as a base",
+  },
+  {
+    value: "dataset_wrap",
+    label: "Dataset wrap",
+    description: "Package a dataset behind an API or UI",
+  },
 ] as const;
 
 export const BUILD_EFFORTS = [

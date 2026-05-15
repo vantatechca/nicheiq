@@ -57,7 +57,9 @@ export function AnnotationsThread({ opportunityId, initial }: Props) {
         body: JSON.stringify({ body: trimmed }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as { data: { annotation: { id: string; createdAt: string } } };
+      const json = (await res.json()) as {
+        data: { annotation: { id: string; createdAt: string } };
+      };
       const userName = data?.user?.name ?? "You";
       setItems((prev) => [
         {
@@ -114,7 +116,9 @@ export function AnnotationsThread({ opportunityId, initial }: Props) {
           <div key={a.id} className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarFallback className="bg-slate-800 text-[10px]">{a.userInitials}</AvatarFallback>
+                <AvatarFallback className="bg-slate-800 text-[10px]">
+                  {a.userInitials}
+                </AvatarFallback>
               </Avatar>
               <span className="text-xs font-medium text-slate-200">{a.userName}</span>
               <span className="text-[10px] text-slate-500">{timeAgo(a.createdAt)}</span>

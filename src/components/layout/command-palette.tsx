@@ -22,12 +22,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { NAV_ITEMS, BRAIN_MODES } from "@/lib/utils/constants";
-import {
-  mockOpportunities,
-  mockProducts,
-  mockCreators,
-  mockNiches,
-} from "@/mock/data";
+import { mockOpportunities, mockProducts, mockCreators, mockNiches } from "@/mock/data";
 import { getRecents, type RecentItem } from "./recent-tracker";
 
 interface Result {

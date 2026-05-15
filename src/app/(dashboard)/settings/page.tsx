@@ -318,18 +318,10 @@ export default function SettingsPage() {
                 >
                   {exporting === "opps" ? "Exporting…" : "Export opportunities (.csv)"}
                 </Button>
-                <Button
-                  variant="outline"
-                  disabled={exporting !== null}
-                  onClick={exportProductsCsv}
-                >
+                <Button variant="outline" disabled={exporting !== null} onClick={exportProductsCsv}>
                   {exporting === "products" ? "Exporting…" : "Export products (.csv)"}
                 </Button>
-                <Button
-                  variant="outline"
-                  disabled={exporting !== null}
-                  onClick={exportCreatorsCsv}
-                >
+                <Button variant="outline" disabled={exporting !== null} onClick={exportCreatorsCsv}>
                   {exporting === "creators" ? "Exporting…" : "Export creators (.csv)"}
                 </Button>
               </div>

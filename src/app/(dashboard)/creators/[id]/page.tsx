@@ -139,9 +139,14 @@ export default function CreatorDetailPage() {
                   <div className="text-xs uppercase text-slate-400">Pricing tiers</div>
                   <div className="mt-1 grid gap-2 sm:grid-cols-3">
                     {playbook.pricingTiers.map((t) => (
-                      <div key={t.label} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-center">
+                      <div
+                        key={t.label}
+                        className="rounded-md border border-slate-800 bg-slate-950/40 p-3 text-center"
+                      >
                         <div className="text-[10px] uppercase text-slate-500">{t.label}</div>
-                        <div className="mt-0.5 text-base font-semibold">{formatUsd(t.priceUsd)}</div>
+                        <div className="mt-0.5 text-base font-semibold">
+                          {formatUsd(t.priceUsd)}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -158,7 +163,9 @@ export default function CreatorDetailPage() {
                   <div className="text-xs uppercase text-slate-400">Top tags</div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {playbook.topTags.map((t: string) => (
-                      <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                      <Badge key={t} variant="outline" className="text-[10px]">
+                        {t}
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -167,7 +174,9 @@ export default function CreatorDetailPage() {
                 <div>
                   <div className="text-xs uppercase text-slate-400">Funnels</div>
                   <ul className="mt-1 list-inside list-disc text-sm text-slate-300">
-                    {playbook.funnels.map((f: string) => <li key={f}>{f}</li>)}
+                    {playbook.funnels.map((f: string) => (
+                      <li key={f}>{f}</li>
+                    ))}
                   </ul>
                 </div>
               ) : null}
@@ -177,8 +186,14 @@ export default function CreatorDetailPage() {
                   <div className="text-sm text-slate-200">{playbook.signatureStyle}</div>
                 </div>
               ) : null}
-              {!playbook.pricingTiers && !playbook.postingCadence && !playbook.topTags && !playbook.funnels && !playbook.signatureStyle ? (
-                <div className="text-xs text-slate-500">No playbook data yet. Click Deep dive to enrich.</div>
+              {!playbook.pricingTiers &&
+              !playbook.postingCadence &&
+              !playbook.topTags &&
+              !playbook.funnels &&
+              !playbook.signatureStyle ? (
+                <div className="text-xs text-slate-500">
+                  No playbook data yet. Click Deep dive to enrich.
+                </div>
               ) : null}
             </CardContent>
           </Card>
@@ -188,11 +203,19 @@ export default function CreatorDetailPage() {
               <CardTitle>Products ({products.length})</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
-              {products.length === 0 && <div className="text-xs text-slate-500">No products tracked yet.</div>}
+              {products.length === 0 && (
+                <div className="text-xs text-slate-500">No products tracked yet.</div>
+              )}
               {products.map((p) => (
-                <Link key={p.id} href={`/products/${p.id}`} className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900">
+                <Link
+                  key={p.id}
+                  href={`/products/${p.id}`}
+                  className="rounded-md border border-slate-800 bg-slate-950/40 p-3 hover:bg-slate-900"
+                >
                   <div className="line-clamp-1 text-sm font-medium">{p.title}</div>
-                  <div className="text-xs text-slate-500">{formatUsd(p.priceUsd ?? 0)} · {p.niche.replace(/_/g, " ")}</div>
+                  <div className="text-xs text-slate-500">
+                    {formatUsd(p.priceUsd ?? 0)} · {p.niche.replace(/_/g, " ")}
+                  </div>
                 </Link>
               ))}
             </CardContent>
@@ -201,18 +224,34 @@ export default function CreatorDetailPage() {
 
         <div className="space-y-6">
           <Card className="border-slate-800 bg-slate-900/40">
-            <CardHeader><CardTitle>Stats</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Stats</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <Row label="Followers" value={formatNumber(c.followerCount ?? 0, { compact: true })} />
+              <Row
+                label="Followers"
+                value={formatNumber(c.followerCount ?? 0, { compact: true })}
+              />
               <Row label="Products" value={String(c.productCount)} />
-              <Row label="Est. revenue" value={formatUsd(c.totalEstRevenueUsd, { compact: true })} />
-              <Row label="Niches" value={c.niches.map((n) => n.replace(/_/g, " ")).join(", ") || "—"} />
-              <Row label="Last enriched" value={c.lastEnrichedAt ? timeAgo(c.lastEnrichedAt) : "—"} />
+              <Row
+                label="Est. revenue"
+                value={formatUsd(c.totalEstRevenueUsd, { compact: true })}
+              />
+              <Row
+                label="Niches"
+                value={c.niches.map((n) => n.replace(/_/g, " ")).join(", ") || "—"}
+              />
+              <Row
+                label="Last enriched"
+                value={c.lastEnrichedAt ? timeAgo(c.lastEnrichedAt) : "—"}
+              />
             </CardContent>
           </Card>
           {c.notes ? (
             <Card className="border-amber-500/30 bg-amber-500/5">
-              <CardHeader><CardTitle className="text-sm text-amber-200">Notes</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-sm text-amber-200">Notes</CardTitle>
+              </CardHeader>
               <CardContent className="text-xs text-amber-100">{c.notes}</CardContent>
             </Card>
           ) : null}

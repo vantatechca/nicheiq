@@ -42,8 +42,7 @@ export interface SendDigestResult {
 
 const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
-const titleCase = (s: string) =>
-  s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const titleCase = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 function escapeHtml(s: string): string {
   return s
@@ -160,9 +159,7 @@ export function buildDigestEmail(input: DigestEmailInput): DigestEmailContent {
       : ["  (none scored this period)"]),
     "",
     "RISING NICHES",
-    risingNiches.length
-      ? `  ${risingNiches.slice(0, 8).map(titleCase).join(", ")}`
-      : "  (none)",
+    risingNiches.length ? `  ${risingNiches.slice(0, 8).map(titleCase).join(", ")}` : "  (none)",
   ];
   if (digestLink) {
     textLines.push("", `Open dashboard: ${digestLink}`);
@@ -171,9 +168,7 @@ export function buildDigestEmail(input: DigestEmailInput): DigestEmailContent {
   return { subject, html, text: textLines.join("\n") };
 }
 
-export async function sendDigestEmail(
-  input: DigestEmailInput,
-): Promise<SendDigestResult> {
+export async function sendDigestEmail(input: DigestEmailInput): Promise<SendDigestResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn("[digest-email] RESEND_API_KEY not set — skipping send");

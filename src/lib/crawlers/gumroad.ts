@@ -19,31 +19,31 @@ const DIGITAL_QUERIES = [
 ];
 
 interface GumroadProduct {
-  id:           string;
-  name:         string;
-  description:  string;
-  price:        number;       // in cents
-  url:          string;
-  preview_url:  string | null;
-  seller_name:  string;
+  id: string;
+  name: string;
+  description: string;
+  price: number; // in cents
+  url: string;
+  preview_url: string | null;
+  seller_name: string;
   rating_count: number;
   rating_average: number | null;
-  tags:         string[];
-  _query:       string;
+  tags: string[];
+  _query: string;
 }
 
 interface GumroadResponse {
   products: GumroadProduct[];
-  total:    number;
+  total: number;
 }
 
 const gumroad: CrawlerModule = {
-  source:           "gumroad",
+  source: "gumroad",
   requiresHeadless: false,
 
   async crawl({ config }) {
     const queries = (config.queries as string[] | undefined) ?? DIGITAL_QUERIES;
-    const count   = (config.count  as number | undefined)   ?? 12;
+    const count = (config.count as number | undefined) ?? 12;
 
     const results: GumroadProduct[] = [];
 
@@ -51,21 +51,18 @@ const gumroad: CrawlerModule = {
       try {
         const params = new URLSearchParams({
           query,
-          from:  "0",
+          from: "0",
           count: String(count),
-          sort:  "featured",
+          sort: "featured",
         });
 
-        const res = await fetch(
-          `https://gumroad.com/discover_search?${params}`,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (compatible; nicheiq-bot/0.1)",
-              "Accept":     "application/json",
-            },
-            signal: AbortSignal.timeout(15_000),
-          }
-        );
+        const res = await fetch(`https://gumroad.com/discover_search?${params}`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; nicheiq-bot/0.1)",
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(15_000),
+        });
 
         if (!res.ok) {
           console.warn(`[gumroad] ${query} → ${res.status}`);
@@ -91,8 +88,8 @@ const gumroad: CrawlerModule = {
   },
 
   normalize(parsed: unknown[]): RawSignal[] {
-    const items  = parsed as GumroadProduct[];
-    const seen   = new Set<string>();
+    const items = parsed as GumroadProduct[];
+    const seen = new Set<string>();
     const signals: RawSignal[] = [];
 
     for (const p of items) {
@@ -105,16 +102,16 @@ const gumroad: CrawlerModule = {
 
       signals.push({
         sourcePlatform: "gumroad",
-        sourceId:       p.id,
-        sourceUrl:      p.url,
-        title:          p.name,
-        snippet:        p.description?.slice(0, 280) || undefined,
+        sourceId: p.id,
+        sourceUrl: p.url,
+        title: p.name,
+        snippet: p.description?.slice(0, 280) || undefined,
         priceUsd,
-        capturedAt:     new Date().toISOString(),
-        tags:           (p.tags ?? []).concat(p._query).slice(0, 12),
-        thumbnailUrl:   p.preview_url ?? undefined,
+        capturedAt: new Date().toISOString(),
+        tags: (p.tags ?? []).concat(p._query).slice(0, 12),
+        thumbnailUrl: p.preview_url ?? undefined,
         creator: {
-          handle:     p.seller_name,
+          handle: p.seller_name,
           profileUrl: `https://gumroad.com/${p.seller_name}`,
         },
         rawJson: p as unknown as Record<string, unknown>,
