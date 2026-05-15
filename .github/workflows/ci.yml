@@ -33,16 +33,16 @@ jobs:
       - name: Unit tests
         run: npm test
         env:
-          USE_MOCK: 'true'
-          NEXTAUTH_SECRET: 'ci-secret-not-real'
+          USE_MOCK: "true"
+          NEXTAUTH_SECRET: "ci-secret-not-real"
 
       - name: Build
         run: npm run build
         env:
-          USE_MOCK: 'true'
-          NEXTAUTH_SECRET: 'ci-secret-not-real'
+          USE_MOCK: "true"
+          NEXTAUTH_SECRET: "ci-secret-not-real"
 
-  e2e:   # ← this is the start of the next job, leave it alone
+  e2e: # ← this is the start of the next job, leave it alone
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: verify
