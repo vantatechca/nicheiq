@@ -5,6 +5,7 @@ import { creators, products } from "@/lib/db/schema";
 import { ok, notFound, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 import { selectModel } from "@/lib/ai/client";
+import { CREATOR_PLAYBOOK_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await requireSession();
@@ -31,8 +32,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const tier3 = selectModel({ tier: 3 });
 
   const { text } = await tier3.complete({
-    system: `You are a digital product market analyst reverse-engineering a creator's strategy.
-Output ONLY valid JSON, no markdown fences.`,
+    system: CREATOR_PLAYBOOK_SYSTEM_PROMPT,
     messages: [
       {
         role: "user",

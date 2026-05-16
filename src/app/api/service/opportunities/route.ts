@@ -6,8 +6,18 @@ import { eq, gte, and, desc, SQL } from "drizzle-orm";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  // Reject if the server key is unconfigured — otherwise the expected header
+  // becomes the literal string "Bearer undefined" and anyone sending exactly
+  // that walks in. Fail closed when the env is missing.
+  const expectedKey = process.env.SERVICE_API_KEY;
+  if (!expectedKey) {
+    return NextResponse.json(
+      { error: "service auth not configured" },
+      { status: 503 },
+    );
+  }
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.SERVICE_API_KEY}`) {
+  if (auth !== `Bearer ${expectedKey}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

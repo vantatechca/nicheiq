@@ -1,26 +1,23 @@
 import { NextRequest } from "next/server";
-import { mockSignals } from "@/mock/data";
-import { ok, paginate, unauthorized } from "@/lib/api/response";
+import { ok, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
+import { listSignals } from "@/lib/repos/signals";
 
 export async function GET(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
 
   const params = req.nextUrl.searchParams;
-  const niche = params.get("niche");
-  const type = params.get("type");
-  const minScore = Number(params.get("minScore") ?? 0);
+  const niche = params.get("niche") ?? undefined;
+  const type = params.get("type") ?? undefined;
+  const minScoreRaw = params.get("minScore");
+  const minScore = minScoreRaw ? Number(minScoreRaw) : undefined;
   const cursor = params.get("cursor") ?? undefined;
   const limit = Math.min(100, Math.max(1, Number(params.get("limit") ?? 25)));
 
-  let rows = [...mockSignals].sort(
-    (a, b) => new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime(),
+  const page = await listSignals({ niche, type, minScore, cursor, limit });
+  return ok(
+    { signals: page.items },
+    { nextCursor: page.nextCursor, total: page.total },
   );
-  if (niche) rows = rows.filter((s) => s.niche === niche);
-  if (type) rows = rows.filter((s) => s.signalType === type);
-  if (minScore) rows = rows.filter((s) => s.score >= minScore);
-
-  const page = paginate(rows, cursor, limit);
-  return ok({ signals: page.items }, { nextCursor: page.nextCursor, total: page.total });
 }

@@ -14,7 +14,7 @@ npm run dev                          # http://localhost:3000
 # Try the demo accounts on the login page; password is `nicheiq123`.
 ```
 
-The dashboard, opportunities, products, creators, niches, trends, sources, rules, digest, resellable, analytics, settings, feed, and Brain pages all render with realistic mock data out of the box.
+The dashboard, opportunities, products, creators, competitors, niches, trends, sources, rules, digest, resellable, analytics, settings, feed, and Brain pages all render with realistic mock data out of the box.
 
 ## Stack
 
@@ -95,13 +95,17 @@ npm run db:migrate           # drizzle-kit migrate (needs DATABASE_URL)
 npm run db:seed              # tsx src/lib/db/seed.ts
 ```
 
-## Vercel deploy
+## Render deploy
 
-1. Push the repo, import into Vercel.
-2. Set env vars from `.env.local.example`. Required: `NEXTAUTH_SECRET`, `DATABASE_URL`, `ANTHROPIC_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`.
-3. Set `USE_MOCK=false`.
-4. After first deploy, run `INNGEST_SIGNING_KEY=… npx inngest-cli sync --url https://<your-domain>/api/inngest` to register cron functions.
-5. Run `DATABASE_URL=… npm run db:migrate` then `npm run db:seed` to populate the seed data.
+The repo ships a `render.yaml` (Render's IaC manifest). The web service runs on the `starter` plan (not `free`) because `/api/inngest` can't tolerate cold starts — Inngest's signing-key check runs on every webhook, and free-tier 15-minute idle spin-down breaks event delivery.
+
+1. Push the repo, then create a new Web Service on Render and point it at this repo. Render reads `render.yaml` automatically.
+2. Set the secrets marked `sync: false` in `render.yaml`: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`. Optional but recommended: `OPENROUTER_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
+3. `USE_MOCK` is set to `"false"` in the manifest. The build runs `npm ci && npm run db:generate && npm run build`.
+4. After first deploy, register cron functions with Inngest: `INNGEST_SIGNING_KEY=… npx inngest-cli sync --url https://<your-render-url>/api/inngest`.
+5. Run `DATABASE_URL=… npm run db:migrate` then `npm run db:seed` against your Neon instance to populate seed data.
+
+Health check is wired to `/api/health` (returns mode + version).
 
 ## Testing
 
