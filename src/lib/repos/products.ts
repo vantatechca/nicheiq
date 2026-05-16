@@ -13,9 +13,5 @@ export async function getTopProducts(limit = 5) {
       .slice(0, limit);
   }
   const db = getDb();
-  return db
-    .select()
-    .from(products)
-    .orderBy(desc(products.estMonthlyRevenueHigh))
-    .limit(limit);
+  return db.select().from(products).orderBy(desc(products.estMonthlyRevenueHigh)).limit(limit);
 }

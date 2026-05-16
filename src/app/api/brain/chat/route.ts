@@ -230,11 +230,7 @@ async function ensureConversation(
   return newId;
 }
 
-async function persistMessage(
-  conversationId: string,
-  role: "user" | "assistant",
-  content: string,
-) {
+async function persistMessage(conversationId: string, role: "user" | "assistant", content: string) {
   const db = getDb();
   const id = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   await db.insert(messagesTable).values({ id, conversationId, role, content });
@@ -304,11 +300,7 @@ export async function POST(req: NextRequest) {
 
   if (useReal) {
     // 1. Resolve or create a conversation
-    conversationId = await ensureConversation(
-      parsed.data.conversationId,
-      userId,
-      parsed.data.mode,
-    );
+    conversationId = await ensureConversation(parsed.data.conversationId, userId, parsed.data.mode);
 
     // 2. Load prior turns — fix for the "Brain has no memory" bug
     const history = await loadHistory(conversationId, userId);

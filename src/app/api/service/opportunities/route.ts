@@ -11,10 +11,7 @@ export async function GET(req: NextRequest) {
   // that walks in. Fail closed when the env is missing.
   const expectedKey = process.env.SERVICE_API_KEY;
   if (!expectedKey) {
-    return NextResponse.json(
-      { error: "service auth not configured" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "service auth not configured" }, { status: 503 });
   }
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${expectedKey}`) {

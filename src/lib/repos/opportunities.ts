@@ -27,17 +27,10 @@ export async function searchOpportunities(query: string, limit = 25) {
 
   const db = getDb();
   if (!q) {
-    return db
-      .select()
-      .from(opportunities)
-      .orderBy(desc(opportunities.score))
-      .limit(10);
+    return db.select().from(opportunities).orderBy(desc(opportunities.score)).limit(10);
   }
   const needle = `%${q}%`;
-  const textMatch = or(
-    ilike(opportunities.title, needle),
-    ilike(opportunities.summary, needle),
-  );
+  const textMatch = or(ilike(opportunities.title, needle), ilike(opportunities.summary, needle));
   return db
     .select()
     .from(opportunities)
@@ -52,11 +45,7 @@ export async function getOpportunity(id: string) {
     return findOpportunity(id) ?? null;
   }
   const db = getDb();
-  const [row] = await db
-    .select()
-    .from(opportunities)
-    .where(eq(opportunities.id, id))
-    .limit(1);
+  const [row] = await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1);
   return row ?? null;
 }
 

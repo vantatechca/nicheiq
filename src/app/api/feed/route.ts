@@ -16,8 +16,5 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Math.max(1, Number(params.get("limit") ?? 25)));
 
   const page = await listSignals({ niche, type, minScore, cursor, limit });
-  return ok(
-    { signals: page.items },
-    { nextCursor: page.nextCursor, total: page.total },
-  );
+  return ok({ signals: page.items }, { nextCursor: page.nextCursor, total: page.total });
 }

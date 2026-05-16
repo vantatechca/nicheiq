@@ -40,23 +40,17 @@ export async function listSignals(opts: ListSignalsOpts) {
 
     const start = opts.cursor ? Math.max(0, parseInt(opts.cursor, 10) || 0) : 0;
     const slice = rows.slice(start, start + limit);
-    const nextCursor =
-      start + slice.length < rows.length ? String(start + slice.length) : null;
+    const nextCursor = start + slice.length < rows.length ? String(start + slice.length) : null;
     return { items: slice, nextCursor, total: rows.length };
   }
 
   const db = getDb();
   const conditions: SQL[] = [];
   if (opts.niche)
-    conditions.push(
-      eq(signals.niche, opts.niche as (typeof signals.niche.enumValues)[number]),
-    );
+    conditions.push(eq(signals.niche, opts.niche as (typeof signals.niche.enumValues)[number]));
   if (opts.type)
     conditions.push(
-      eq(
-        signals.signalType,
-        opts.type as (typeof signals.signalType.enumValues)[number],
-      ),
+      eq(signals.signalType, opts.type as (typeof signals.signalType.enumValues)[number]),
     );
   if (opts.minScore) conditions.push(gte(signals.score, opts.minScore));
 

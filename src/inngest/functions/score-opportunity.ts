@@ -31,10 +31,7 @@ export const scoreOpportunity = inngest.createFunction(
         .where(eq(trends.niche, opp.niche));
       const avgGrowth = Number(trendRow?.avgGrowth ?? 0);
 
-      const ruleRows = await db
-        .select()
-        .from(goldenRules)
-        .where(eq(goldenRules.active, true));
+      const ruleRows = await db.select().from(goldenRules).where(eq(goldenRules.active, true));
       const patternRows = await db.select().from(feedbackPatterns);
 
       // Drizzle returns Date for timestamp columns; the GoldenRule and

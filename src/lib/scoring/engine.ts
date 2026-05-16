@@ -110,11 +110,7 @@ export function dimensionsFromHeuristics(input: {
   const demand = clamp(5 + input.signalCount * 6 + Math.max(0, input.trendGrowthPct), 0, 100);
   const competition = clamp(20 + (input.competitorListings ?? 0) * 4, 0, 100);
   // No revenue estimate → ~0 (was: defaulted to $1000 and gave ~31).
-  const revenue = clamp(
-    Math.log10(Math.max(1, input.estMonthlyRevenueHigh ?? 0)) * 22,
-    0,
-    100,
-  );
+  const revenue = clamp(Math.log10(Math.max(1, input.estMonthlyRevenueHigh ?? 0)) * 22, 0, 100);
   const trend = clamp(25 + input.trendGrowthPct, 0, 100);
   const effortMap: Record<string, number> = {
     weekend: 10,
