@@ -41,3 +41,13 @@ export const TOOL_INSTRUCTION = `When you need to surface or modify a record, us
 - get_creator(id)
 - shortlist_opportunity(id)
 - annotate_opportunity(id, body)`;
+
+// ── Route-specific system prompts ────────────────────────────────────
+// One prompt per file route. Extracted out of route handlers so they're
+// versioned in one place and can be A/B'd without touching route code.
+
+export const DIGEST_SYSTEM_PROMPT = `You are a sharp digital product market analyst writing a concise daily digest for a solo founder.
+Be direct, specific, and actionable. No fluff. Max 4 sentences.`;
+
+export const CREATOR_PLAYBOOK_SYSTEM_PROMPT = `You are a digital product market analyst reverse-engineering a creator's strategy.
+Output ONLY valid JSON, no markdown fences.`;

@@ -80,11 +80,23 @@ export interface AiCompleteResult {
   usage?: AiUsage;
 }
 
+export interface AiStreamWithUsage {
+  /** Text chunks. Iterate to forward to the client. */
+  stream: AsyncIterable<string>;
+  /** Resolves with final usage after the stream completes (or aborts). Never rejects. */
+  done: Promise<AiUsage>;
+}
+
 export interface AiClient {
   tier: AiTier;
   modelId: string;
   complete(opts: AiCallOptions): Promise<AiCompleteResult>;
   stream(opts: AiCallOptions): AsyncIterable<string>;
+  /**
+   * Like stream() but also returns a `done` promise with usage stats.
+   * Use this for any billed call so spend reconciliation can run.
+   */
+  streamWithUsage(opts: AiCallOptions): AiStreamWithUsage;
 }
 
 const MODELS = {
@@ -92,6 +104,28 @@ const MODELS = {
   2: { provider: "anthropic", id: "claude-haiku-4-5" },
   3: { provider: "anthropic", id: "claude-sonnet-4-6" },
 } as const;
+
+// ── Pricing (single source of truth) ─────────────────────────────────
+// USD per million tokens. Cache write/read are multipliers applied to the
+// input rate (Anthropic: cache write 1.25×, cache read 0.1×). Update when
+// provider list prices change — every cost calc in the app pulls from here.
+export const PRICING: Record<
+  AiTier,
+  { input: number; output: number; cacheWriteMult: number; cacheReadMult: number }
+> = {
+  1: { input: 0.4, output: 0.4, cacheWriteMult: 0, cacheReadMult: 0 },
+  2: { input: 1, output: 5, cacheWriteMult: 1.25, cacheReadMult: 0.1 },
+  3: { input: 3, output: 15, cacheWriteMult: 1.25, cacheReadMult: 0.1 },
+};
+
+export function estimateCostUsd(tier: AiTier, usage: AiUsage): number {
+  const p = PRICING[tier];
+  const inputCost = usage.inputTokens * p.input;
+  const outputCost = usage.outputTokens * p.output;
+  const cacheWriteCost = (usage.cacheCreationInputTokens ?? 0) * p.input * p.cacheWriteMult;
+  const cacheReadCost = (usage.cacheReadInputTokens ?? 0) * p.input * p.cacheReadMult;
+  return (inputCost + outputCost + cacheWriteCost + cacheReadCost) / 1_000_000;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function buildAnthropicSystem(opts: AiCallOptions) {
@@ -174,6 +208,50 @@ export function selectModel({ tier }: { tier: AiTier; task?: string }): AiClient
           }
         }
       },
+      streamWithUsage(opts) {
+        let resolveUsage!: (u: AiUsage) => void;
+        const done = new Promise<AiUsage>((res) => {
+          resolveUsage = res;
+        });
+        const acc: AiUsage = { inputTokens: 0, outputTokens: 0 };
+
+        const stream = (async function* () {
+          try {
+            const upstream = await anthropic().messages.create(
+              {
+                model: model.id,
+                system: buildAnthropicSystem(opts),
+                messages: opts.messages,
+                max_tokens: opts.maxTokens ?? 1024,
+                temperature: opts.temperature ?? 0.3,
+                stream: true,
+              },
+              { signal: opts.signal },
+            );
+
+            for await (const event of upstream) {
+              if (event.type === "message_start") {
+                const u = event.message.usage as UsageWithCache;
+                acc.inputTokens = u.input_tokens;
+                acc.cacheCreationInputTokens = u.cache_creation_input_tokens ?? undefined;
+                acc.cacheReadInputTokens = u.cache_read_input_tokens ?? undefined;
+              } else if (
+                event.type === "content_block_delta" &&
+                event.delta.type === "text_delta"
+              ) {
+                yield event.delta.text;
+              } else if (event.type === "message_delta") {
+                acc.outputTokens = event.usage.output_tokens;
+              }
+            }
+          } finally {
+            // Always resolve — partial usage on abort is better than a hung promise.
+            resolveUsage(acc);
+          }
+        })();
+
+        return { stream, done };
+      },
     };
   }
 
@@ -212,6 +290,42 @@ export function selectModel({ tier }: { tier: AiTier; task?: string }): AiClient
         const text = chunk.choices[0]?.delta?.content;
         if (text) yield text;
       }
+    },
+    streamWithUsage(opts) {
+      let resolveUsage!: (u: AiUsage) => void;
+      const done = new Promise<AiUsage>((res) => {
+        resolveUsage = res;
+      });
+      const acc: AiUsage = { inputTokens: 0, outputTokens: 0 };
+
+      const stream = (async function* () {
+        try {
+          const upstream = await openrouter().chat.completions.create(
+            {
+              model: model.id,
+              messages: toOpenAiMessages(opts),
+              max_tokens: opts.maxTokens ?? 1024,
+              temperature: opts.temperature ?? 0.3,
+              stream: true,
+              stream_options: { include_usage: true },
+            },
+            { signal: opts.signal },
+          );
+          for await (const chunk of upstream) {
+            const text = chunk.choices[0]?.delta?.content;
+            if (text) yield text;
+            // Usage arrives in the final chunk when include_usage is set.
+            if (chunk.usage) {
+              acc.inputTokens = chunk.usage.prompt_tokens;
+              acc.outputTokens = chunk.usage.completion_tokens;
+            }
+          }
+        } finally {
+          resolveUsage(acc);
+        }
+      })();
+
+      return { stream, done };
     },
   };
 }
@@ -270,29 +384,4 @@ export async function getSpendStatus(): Promise<{ spentCents: number; capCents: 
   if (!redis) return { spentCents: 0, capCents: cap };
   const v = (await redis.get<number>(spendKey())) ?? 0;
   return { spentCents: v, capCents: cap };
-}
-
-// ── Backward-compat shims ────────────────────────────────────────────
-// The old API expected dollars, not cents, and a non-atomic record.
-// Existing route handlers (e.g. /api/brain/chat) use these.
-// New code should prefer reserveSpend + recordActualSpend.
-
-/** @deprecated Use reserveSpend + recordActualSpend for race-safe accounting. */
-export async function checkSpendCap(): Promise<{ allowed: boolean; spent: number; cap: number }> {
-  const s = await getSpendStatus();
-  return {
-    allowed: s.spentCents < s.capCents,
-    spent: s.spentCents / 100,
-    cap: s.capCents / 100,
-  };
-}
-
-/** @deprecated Use recordActualSpend(estimate, actual) for proper reconciliation. */
-export async function recordSpend(usd: number): Promise<void> {
-  if (!redis) return;
-  const cents = Math.round(usd * 100);
-  if (cents === 0) return;
-  const key = spendKey();
-  await redis.incrby(key, cents);
-  await redis.expire(key, 60 * 60 * 26);
 }

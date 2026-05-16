@@ -92,6 +92,13 @@ export function compute(input: ScoreInputs): ScoreBreakdown {
 }
 
 // Heuristic helpers: derive dimensions from raw signals, used until real crawlers run.
+//
+// Base values are tuned so a totally evidence-less opportunity (zero signals,
+// flat trend, no revenue estimate, no competitor data) scores LOW — around
+// 20-25 overall. The previous bases of 40/50/+10 produced a misleading ~40
+// score for opportunities with no supporting data, masking weak signals as
+// merely "mediocre". Once real signals/trends/revenue numbers arrive, the
+// multipliers carry the score upward as before.
 
 export function dimensionsFromHeuristics(input: {
   signalCount: number;
@@ -100,14 +107,11 @@ export function dimensionsFromHeuristics(input: {
   competitorListings?: number;
   buildEffortKey: string;
 }): DimensionInputs {
-  const demand = clamp(40 + input.signalCount * 4 + Math.max(0, input.trendGrowthPct), 0, 100);
-  const competition = clamp(20 + (input.competitorListings ?? 8) * 4, 0, 100);
-  const revenue = clamp(
-    Math.log10(Math.max(1, input.estMonthlyRevenueHigh ?? 1000)) * 22 + 10,
-    0,
-    100,
-  );
-  const trend = clamp(50 + input.trendGrowthPct, 0, 100);
+  const demand = clamp(5 + input.signalCount * 6 + Math.max(0, input.trendGrowthPct), 0, 100);
+  const competition = clamp(20 + (input.competitorListings ?? 0) * 4, 0, 100);
+  // No revenue estimate → ~0 (was: defaulted to $1000 and gave ~31).
+  const revenue = clamp(Math.log10(Math.max(1, input.estMonthlyRevenueHigh ?? 0)) * 22, 0, 100);
+  const trend = clamp(25 + input.trendGrowthPct, 0, 100);
   const effortMap: Record<string, number> = {
     weekend: 10,
     week: 25,

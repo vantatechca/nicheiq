@@ -3,6 +3,7 @@ import { desc, eq, gt, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { opportunities, signals, digests } from "@/lib/db/schema";
 import { selectModel } from "@/lib/ai/client";
+import { DIGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { ok, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 import { sendDigestEmail } from "@/lib/email/digest";
@@ -59,8 +60,7 @@ export async function POST(_req: NextRequest) {
     const platformList = signalStats.map((s) => `${s.platform}: ${s.count} signals`).join(", ");
 
     const { text } = await tier3.complete({
-      system: `You are a sharp digital product market analyst writing a concise daily digest for a solo founder. 
-Be direct, specific, and actionable. No fluff. Max 4 sentences.`,
+      system: DIGEST_SYSTEM_PROMPT,
       messages: [
         {
           role: "user",

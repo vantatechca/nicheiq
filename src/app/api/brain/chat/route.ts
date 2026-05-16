@@ -1,12 +1,20 @@
 import { NextRequest } from "next/server";
+import { and, asc, eq } from "drizzle-orm";
 import { brainMessageSchema } from "@/lib/utils/validation";
 import { assembleContext } from "@/lib/ai/context-assembler";
 import type { BrainMode } from "@/lib/ai/context-assembler";
 import { requireSession } from "@/lib/auth/session";
 import { getRateLimiter } from "@/lib/redis/client";
+import { getDb } from "@/lib/db/client";
+import { conversations, messages as messagesTable } from "@/lib/db/schema";
+import { selectModel, estimateCostUsd, reserveSpend, recordActualSpend } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// ── Canned (mock-mode) responses ─────────────────────────────────────
+// Used when USE_MOCK is true OR when ANTHROPIC_API_KEY is missing
+// (mock-fallback). Kept verbatim from the previous implementation.
 
 const cannedByMode: Record<BrainMode, string[]> = {
   global: [
@@ -86,24 +94,26 @@ async function streamCannedResponse(
   });
 }
 
-async function streamRealResponse(opts: {
-  systemPrompt: string;
+// ── Live AI streaming ────────────────────────────────────────────────
+// Routes through selectModel({tier:3}).streamWithUsage so:
+//   1. Provider abstraction is preserved (AGENTS rule).
+//   2. The system context goes through `cacheableSystem` — Anthropic
+//      ephemeral prompt caching kicks in on the second turn onward,
+//      cutting input-token billing on the (large) context to 10%.
+//   3. Spend is reconciled with cache-aware pricing from PRICING.
+
+const ESTIMATE_USD = 0.03; // ~2k input + ~1k output, reserved up front
+
+interface LiveStreamOpts {
+  cacheableSystem: string;
   history: { role: "user" | "assistant"; content: string }[];
   message: string;
   signal?: AbortSignal;
-}): Promise<ReadableStream<Uint8Array>> {
-  const { reserveSpend, recordActualSpend } = await import("@/lib/ai/client");
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
+  /** Called once the full assistant reply is known (stream complete or aborted). */
+  onComplete: (assistantText: string) => Promise<void> | void;
+}
 
-  // Tier-3 (Sonnet 4.6) pricing per million tokens. Keep in sync with the
-  // PRICING table in lib/ai/client.ts. Estimate: typical Brain reply spans
-  // ~2k input + ~1k output ≈ $0.021. Reserve a touch higher to avoid
-  // post-reconciliation overruns blowing the cap by a cent.
-  const TIER3_INPUT_PER_MTOK = 3;
-  const TIER3_OUTPUT_PER_MTOK = 15;
-  const ESTIMATE_USD = 0.03;
-  const MODEL_ID = process.env.AI_TIER3_MODEL ?? "claude-sonnet-4-6";
-
+async function streamLive(opts: LiveStreamOpts): Promise<ReadableStream<Uint8Array>> {
   const cap = await reserveSpend(ESTIMATE_USD);
   if (!cap.allowed) {
     const capDollars = (cap.capCents / 100).toFixed(2);
@@ -116,61 +126,130 @@ async function streamRealResponse(opts: {
     });
   }
 
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    maxRetries: 2,
+  const tier3 = selectModel({ tier: 3 });
+  const { stream: textStream, done: usageDone } = tier3.streamWithUsage({
+    cacheableSystem: opts.cacheableSystem,
+    messages: [...opts.history, { role: "user", content: opts.message }],
+    maxTokens: 1024,
+    temperature: 0.3,
+    signal: opts.signal,
   });
 
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
+      let assistantText = "";
       let actualUsd = 0;
       try {
-        const stream = anthropic.messages.stream(
-          {
-            model: MODEL_ID,
-            system: opts.systemPrompt,
-            messages: [...opts.history, { role: "user", content: opts.message }],
-            max_tokens: 1024,
-            temperature: 0.3,
-          },
-          { signal: opts.signal },
-        );
-
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text));
-          }
+        for await (const chunk of textStream) {
+          assistantText += chunk;
+          controller.enqueue(encoder.encode(chunk));
         }
-
-        // finalMessage() resolves after stream ends with the full usage object.
-        const final = await stream.finalMessage();
-        actualUsd =
-          (final.usage.input_tokens * TIER3_INPUT_PER_MTOK +
-            final.usage.output_tokens * TIER3_OUTPUT_PER_MTOK) /
-          1_000_000;
+        const usage = await usageDone;
+        actualUsd = estimateCostUsd(3, usage);
       } catch (err) {
         controller.enqueue(encoder.encode(`\n\n[stream error: ${(err as Error).message}]`));
+        try {
+          const usage = await usageDone;
+          actualUsd = estimateCostUsd(3, usage);
+        } catch {
+          /* leave actualUsd at 0; reservation still released below */
+        }
       } finally {
-        // Reconcile: if we reserved $0.03 and actually used $0.018, this
-        // returns $0.012 to the daily cap. Race-safe via INCRBY in Redis.
+        // Reconcile against the reserved estimate. Race-safe via Redis INCRBY.
         await recordActualSpend(ESTIMATE_USD, actualUsd);
+        // Persist the assistant reply (even if partial) so the next turn has context.
+        try {
+          await opts.onComplete(assistantText);
+        } catch (persistErr) {
+          console.error("[brain/chat] failed to persist assistant message:", persistErr);
+        }
         controller.close();
       }
     },
   });
 }
 
+// ── DB helpers (live mode only) ──────────────────────────────────────
+
+async function loadHistory(
+  conversationId: string,
+  userId: string,
+): Promise<{ role: "user" | "assistant"; content: string }[]> {
+  const db = getDb();
+  // Verify ownership before reading messages so a user can't peek into
+  // someone else's conversation by guessing an id.
+  const [conv] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .limit(1);
+  if (!conv) return [];
+
+  const rows = await db
+    .select({ role: messagesTable.role, content: messagesTable.content })
+    .from(messagesTable)
+    .where(eq(messagesTable.conversationId, conversationId))
+    .orderBy(asc(messagesTable.createdAt));
+
+  // The schema role enum includes "system"; only user/assistant turns
+  // belong in the model history.
+  return rows
+    .filter(
+      (r): r is { role: "user" | "assistant"; content: string } =>
+        r.role === "user" || r.role === "assistant",
+    )
+    .map((r) => ({ role: r.role, content: r.content }));
+}
+
+async function ensureConversation(
+  conversationId: string | undefined,
+  userId: string,
+  brainMode: BrainMode,
+): Promise<string> {
+  const db = getDb();
+  if (conversationId) {
+    const [existing] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+      .limit(1);
+    if (existing) return existing.id;
+    // Fall through: the client provided an id we don't own. Create a new one
+    // rather than 403 — gentler UX for stale local state.
+  }
+
+  const newId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  await db.insert(conversations).values({
+    id: newId,
+    userId,
+    brainMode,
+    contextRefs: {},
+    title: "New conversation",
+  });
+  return newId;
+}
+
+async function persistMessage(conversationId: string, role: "user" | "assistant", content: string) {
+  const db = getDb();
+  const id = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  await db.insert(messagesTable).values({ id, conversationId, role, content });
+  await db
+    .update(conversations)
+    .set({ lastMessageAt: new Date() })
+    .where(eq(conversations.id, conversationId));
+}
+
+// ── Route handler ────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
-  // Auth gate — must be signed in to ask the Brain.
   const session = await requireSession();
   if (!session) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
   const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
 
-  // Rate limit: 10 requests per minute per user. Returns null if Redis isn't
-  // configured (dev / mock mode), so we fall through and allow.
+  // Rate limit: 10/min per user. Returns null when Redis isn't configured.
   const limiter = getRateLimiter({ limit: 10, window: "1 m", key: "brain-chat" });
   if (limiter) {
     const { success, limit, remaining, reset } = await limiter.limit(userId);
@@ -204,34 +283,63 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return new Response(
       JSON.stringify({ error: "Invalid body", details: parsed.error.flatten() }),
-      {
-        status: 400,
-      },
+      { status: 400 },
     );
   }
 
-  const useReal = process.env.USE_MOCK === "false" && !!process.env.ANTHROPIC_API_KEY;
-  const conversationId = parsed.data.conversationId ?? `conv_${Date.now()}`;
+  // Live mode requires BOTH USE_MOCK=false and a configured AI key. If the
+  // operator set USE_MOCK=false but forgot the key, fall back to canned
+  // output and surface the misconfig via response headers.
+  const wantsLive = process.env.USE_MOCK === "false";
+  const hasAiKey = !!process.env.ANTHROPIC_API_KEY;
+  const useReal = wantsLive && hasAiKey;
+  const aiMode = useReal ? "live" : wantsLive && !hasAiKey ? "mock-fallback" : "mock";
 
-  const stream = useReal
-    ? await streamRealResponse({
-        systemPrompt: assembleContext({
-          mode: parsed.data.mode,
-          refIds: parsed.data.contextRefs,
-          userId,
-        }),
-        history: [],
-        message: parsed.data.message,
-        signal: req.signal,
-      })
-    : await streamCannedResponse(parsed.data.message, parsed.data.mode);
+  let conversationId: string;
+  let stream: ReadableStream<Uint8Array>;
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "x-conversation-id": conversationId,
-      "x-ai-mode": useReal ? "live" : "mock",
-    },
-  });
+  if (useReal) {
+    // 1. Resolve or create a conversation
+    conversationId = await ensureConversation(parsed.data.conversationId, userId, parsed.data.mode);
+
+    // 2. Load prior turns — fix for the "Brain has no memory" bug
+    const history = await loadHistory(conversationId, userId);
+
+    // 3. Persist the user message immediately so it survives a crash mid-stream
+    await persistMessage(conversationId, "user", parsed.data.message);
+
+    // 4. Stream the assistant response, persisting on completion
+    stream = await streamLive({
+      cacheableSystem: assembleContext({
+        mode: parsed.data.mode,
+        refIds: parsed.data.contextRefs,
+        userId,
+      }),
+      history,
+      message: parsed.data.message,
+      signal: req.signal,
+      onComplete: async (assistantText) => {
+        if (assistantText.trim().length > 0) {
+          await persistMessage(conversationId, "assistant", assistantText);
+        }
+      },
+    });
+  } else {
+    // Mock / fallback: don't touch the DB. ConversationId is decorative here.
+    conversationId = parsed.data.conversationId ?? `conv_${Date.now()}`;
+    stream = await streamCannedResponse(parsed.data.message, parsed.data.mode);
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "x-conversation-id": conversationId,
+    "x-ai-mode": aiMode,
+  };
+  if (aiMode === "mock-fallback") {
+    headers["x-ai-warning"] =
+      "USE_MOCK=false but ANTHROPIC_API_KEY is missing — serving canned responses.";
+  }
+
+  return new Response(stream, { headers });
 }
