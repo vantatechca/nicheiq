@@ -315,6 +315,12 @@ export const products = pgTable(
     thumbnailUrl: text("thumbnail_url"),
     rawJson: jsonb("raw_json"),
     embedding: vector("embedding", { dimensions: 1536 }),
+    // Links this product back to the opportunity it was launched from.
+    // NULL when the row is a competitor product (promoted from a signal
+    // for market intelligence); set when the row represents YOUR shipped
+    // product. The /products page uses this to split "Mine" vs
+    // "Competitors" views without needing a separate table.
+    opportunityId: text("opportunity_id"),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -322,6 +328,7 @@ export const products = pgTable(
     sourceUrlIdx: uniqueIndex("products_source_url_idx").on(t.sourcePlatform, t.sourceUrl),
     nicheIdx: index("products_niche_idx").on(t.niche),
     creatorIdx: index("products_creator_idx").on(t.creatorId),
+    opportunityIdx: index("products_opportunity_idx").on(t.opportunityId),
   }),
 );
 
