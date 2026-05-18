@@ -5,15 +5,27 @@ import { opportunities, signals, trends, goldenRules, feedbackPatterns } from "@
 import { ok, notFound, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 import { compute, dimensionsFromHeuristics } from "@/lib/scoring/engine";
-import { inngest } from "@/inngest/client";
+import type { GoldenRule, FeedbackPattern } from "@/lib/types";
 
+/**
+ * Recompute and persist a single opportunity's score.
+ *
+ * Previous version computed inline, persisted, then fired
+ * `opportunity/score.requested` — and the Inngest handler then re-fetched,
+ * re-computed, and re-persisted the same value. Double-write every click.
+ *
+ * The route is now the single owner of synchronous recomputes (so the
+ * "Rescore" button returns the new value immediately). The Inngest handler
+ * is still useful for batch jobs — e.g. recomputing every opportunity
+ * after a rule change — but it should be invoked explicitly for that
+ * purpose, not as a no-op side effect of a synchronous user action.
+ */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await requireSession();
   if (!session) return unauthorized();
 
   const db = getDb();
 
-  // Fetch opportunity
   const [opp] = await db
     .select()
     .from(opportunities)
@@ -21,23 +33,39 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .limit(1);
   if (!opp) return notFound();
 
-  // Fetch linked signals
   const linkedSignals = opp.sourceSignalIds.length
     ? await db.select().from(signals).where(inArray(signals.id, opp.sourceSignalIds))
     : [];
 
-  // Fetch avg trend growth for niche
   const [trendRow] = await db
     .select({ avgGrowth: avg(trends.growthPct) })
     .from(trends)
     .where(eq(trends.niche, opp.niche));
   const avgGrowth = Number(trendRow?.avgGrowth ?? 0);
 
-  // Fetch active rules + patterns
-  const rules = await db.select().from(goldenRules).where(eq(goldenRules.active, true));
-  const patterns = await db.select().from(feedbackPatterns);
+  const ruleRows = await db.select().from(goldenRules).where(eq(goldenRules.active, true));
+  const patternRows = await db.select().from(feedbackPatterns);
 
-  // Compute dimensions
+  // Bridge Drizzle's typed timestamp columns to ISO strings for the
+  // GoldenRule / FeedbackPattern shapes. Drizzle types these as Date, but
+  // the neon-http driver actually returns them as ISO strings — calling
+  // .toISOString() on a string throws. `new Date(x)` accepts either form
+  // and normalizes both code paths so this also works if you ever swap to
+  // the standard pg driver later.
+  const toIso = (v: Date | string): string => (typeof v === "string" ? v : v.toISOString());
+
+  const rules: GoldenRule[] = ruleRows.map((r) => ({
+    ...r,
+    niche: r.niche as GoldenRule["niche"],
+    createdAt: toIso(r.createdAt as unknown as Date | string),
+  }));
+  const patterns: FeedbackPattern[] = patternRows.map((p) => ({
+    ...p,
+    niche: p.niche as FeedbackPattern["niche"],
+    derivedFrom: p.derivedFrom as FeedbackPattern["derivedFrom"],
+    lastConfirmedAt: toIso(p.lastConfirmedAt as unknown as Date | string),
+  }));
+
   const dimensions = dimensionsFromHeuristics({
     signalCount: linkedSignals.length,
     trendGrowthPct: avgGrowth,
@@ -46,7 +74,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     buildEffortKey: opp.buildEffort,
   });
 
-  // Compute score
   const breakdown = compute({
     opportunity: {
       title: opp.title,
@@ -57,11 +84,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       aiRationale: opp.aiRationale,
     },
     dimensions,
-    rules: rules as any,
-    patterns: patterns as any,
+    rules,
+    patterns,
   });
 
-  // Persist
   await db
     .update(opportunities)
     .set({
@@ -70,12 +96,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       updatedAt: new Date(),
     })
     .where(eq(opportunities.id, params.id));
-
-  // Fire Inngest event for downstream reactions
-  await inngest.send({
-    name: "opportunity/score.requested",
-    data: { opportunityId: params.id, score: breakdown.finalScore },
-  });
 
   return ok({ score: breakdown.finalScore, breakdown });
 }

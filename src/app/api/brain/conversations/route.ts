@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { conversations } from "@/lib/db/schema";
+import { conversations, messages } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 
@@ -26,10 +26,27 @@ export async function GET(_req: NextRequest) {
   const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
 
   const db = getDb();
+
+  // Aggregate messageCount with a LEFT JOIN + GROUP BY so the sidebar can
+  // render "N messages" without N additional round trips. LEFT JOIN keeps
+  // brand-new (empty) conversations in the list with count = 0.
+  // Previously this endpoint returned conversations without a messageCount
+  // field at all, and the UI rendered "undefined messages" for every row.
   const rows = await db
-    .select()
+    .select({
+      id: conversations.id,
+      userId: conversations.userId,
+      brainMode: conversations.brainMode,
+      contextRefs: conversations.contextRefs,
+      title: conversations.title,
+      lastMessageAt: conversations.lastMessageAt,
+      createdAt: conversations.createdAt,
+      messageCount: sql<number>`COUNT(${messages.id})::int`.as("message_count"),
+    })
     .from(conversations)
+    .leftJoin(messages, eq(messages.conversationId, conversations.id))
     .where(eq(conversations.userId, userId))
+    .groupBy(conversations.id)
     .orderBy(desc(conversations.lastMessageAt));
 
   return ok({ conversations: rows });
@@ -61,5 +78,8 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  return created({ conversation });
+  // Match the GET shape so the client can drop the new row straight into
+  // its sorted list without a refetch. New conversations always start at
+  // 0 messages.
+  return created({ conversation: { ...conversation, messageCount: 0 } });
 }

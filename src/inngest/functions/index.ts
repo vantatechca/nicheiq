@@ -10,6 +10,9 @@ import { crawlReddit } from "./crawl-reddit";
 import { crawlEtsy } from "./crawl-etsy";
 import { crawlProductHunt } from "./crawl-product-hunt";
 import { crawlHackerNews } from "./crawl-hacker-news";
+import { crawlGumroad } from "./crawl-gumroad";
+import { crawlEnvato } from "./crawl-envato";
+import { crawlKaggle } from "./crawl-kaggle";
 import { deepDiveCreator } from "./deep-dive-creator";
 
 export const allFunctions = [
@@ -26,5 +29,8 @@ export const allFunctions = [
   crawlEtsy,
   crawlProductHunt,
   crawlHackerNews,
+  crawlGumroad,
+  crawlEnvato,
+  crawlKaggle,
   deepDiveCreator,
 ];

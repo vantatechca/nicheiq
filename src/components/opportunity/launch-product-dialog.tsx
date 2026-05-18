@@ -38,9 +38,7 @@ interface Props {
 // Only show platforms a creator would realistically launch on. Filtering
 // out things like Reddit / HN / Google Trends that are signal sources,
 // not selling channels.
-const LAUNCH_PLATFORMS = SOURCE_PLATFORMS.filter(
-  (p) => p.category === "marketplace",
-);
+const LAUNCH_PLATFORMS = SOURCE_PLATFORMS.filter((p) => p.category === "marketplace");
 
 export function LaunchProductDialog({
   open,
@@ -126,9 +124,9 @@ export function LaunchProductDialog({
             <Rocket className="h-4 w-4 text-emerald-400" /> Launch product
           </DialogTitle>
           <DialogDescription>
-            Graduate this opportunity into a tracked product in your portfolio.
-            The opportunity moves to <code className="rounded bg-slate-800 px-1">launched</code>{" "}
-            and a new product row gets created linked back to it.
+            Graduate this opportunity into a tracked product in your portfolio. The opportunity
+            moves to <code className="rounded bg-slate-800 px-1">launched</code> and a new product
+            row gets created linked back to it.
           </DialogDescription>
         </DialogHeader>
 
@@ -203,7 +201,11 @@ export function LaunchProductDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={pending || !launchUrl.trim()}>
-            {pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Rocket className="mr-1 h-4 w-4" />}
+            {pending ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Rocket className="mr-1 h-4 w-4" />
+            )}
             Launch
           </Button>
         </DialogFooter>

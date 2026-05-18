@@ -46,12 +46,11 @@ export default function BrainPage() {
 
 function BrainView() {
   const params = useSearchParams();
-  const { data: session } = useSession();
+  useSession(); // keeps SessionProvider warm
   const router = useRouter();
   const queryMode = params.get("mode") ?? "global";
   const queryId = params.get("id");
 
-  // Fetch conversation list from API.
   const { data: convData, refetch: refetchConversations } = useApi<{
     conversations: Conversation[];
   }>("/api/brain/conversations");
@@ -60,16 +59,14 @@ function BrainView() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [mode, setMode] = useState<string>(queryMode);
 
-  // Once conversations load, pick the first one (if not arriving with ?id=).
   useEffect(() => {
-    if (queryId) return; // seeding path will set it
-    if (activeId) return; // already chose
+    if (queryId) return;
+    if (activeId) return;
     if (conversations.length === 0) return;
     setActiveId(conversations[0]!.id);
     setMode(conversations[0]!.brainMode);
   }, [conversations, queryId, activeId]);
 
-  // Fetch messages for the active conversation.
   const { data: msgData } = useApi<{ messages: Message[] }>(
     activeId ? `/api/brain/conversations/${activeId}` : null,
   );
@@ -80,7 +77,8 @@ function BrainView() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Seed a fresh conversation when arriving with ?id=. POSTs to the API so it
-  // persists across reloads.
+  // persists across reloads. The seed-once ref prevents the effect from
+  // re-running after router.replace clears the params.
   const seededRef = useRef<string | null>(null);
   useEffect(() => {
     if (!queryId) return;
@@ -88,9 +86,15 @@ function BrainView() {
     seededRef.current = queryId;
 
     const contextRefs = contextRefsForMode(queryMode, queryId);
-    const title = titleForMode(queryMode, queryId);
 
     (async () => {
+      // Resolve a human-readable title from the actual entity (opportunity
+      // title, creator name, niche label, etc.) so the sidebar shows
+      // "Opportunity: Notion second-brain for indie SaaS founders" instead
+      // of "Opportunity — opportunity_use…". Falls back to the ID if the
+      // fetch fails so we never block conversation creation on a 404.
+      const title = await resolveTitleForMode(queryMode, queryId);
+
       try {
         const res = await api.post<{ conversation: Conversation }>("/api/brain/conversations", {
           brainMode: queryMode,
@@ -286,7 +290,7 @@ function BrainView() {
             initialMessages={initialMessages}
             mode={mode}
             conversationId={active?.id}
-            contextRefs={active?.contextRefs}
+            contextRefs={active?.contextRefs as Record<string, unknown> | undefined}
             placeholder="Pressure-test an opportunity, draft a build plan, ask what to build next."
           />
         </div>
@@ -311,26 +315,127 @@ function BrainView() {
   );
 }
 
-function contextRefsForMode(mode: string, id: string): Record<string, string> {
+/**
+ * Builds the `contextRefs` payload in the shape that `brainMessageSchema`
+ * (and the Anthropic context-assembler) actually expect: plural array
+ * fields under specific keys. The previous version returned singular keys
+ * like `opportunityId`, which Zod stripped silently — the assembler then
+ * saw empty arrays and the AI was told "(no opportunities selected)",
+ * which is the "di lumalabas yung pinindot" bug.
+ *
+ * Schema expects:
+ *   opportunityIds: string[]
+ *   productIds:     string[]
+ *   creatorIds:     string[]
+ *   niches:         string[]  (slugs from the niche enum)
+ *   assetIds:       string[]  (resellable asset ids)
+ */
+function contextRefsForMode(mode: string, id: string): Record<string, string[]> {
   switch (mode) {
-    case "dataset_review":
-      return { resellableAssetId: id };
     case "opportunity":
-      return { opportunityId: id };
-    case "niche":
-      return { nicheId: id };
-    case "creator":
-      return { creatorId: id };
-    case "replicate":
-      return { sourceProductId: id };
     case "build_plan":
-      return { opportunityId: id };
+      return { opportunityIds: [id] };
+    case "replicate":
+      // Replicate is anchored on a source product but the assembler also
+      // accepts an opportunity ref. Send both so either path resolves.
+      return { opportunityIds: [id], productIds: [id] };
+    case "creator":
+      return { creatorIds: [id] };
+    case "niche":
+      // The route id IS the niche slug — pass it through.
+      return { niches: [id] };
+    case "dataset_review":
+      return { assetIds: [id] };
+    case "global":
     default:
-      return { id };
+      return {};
   }
 }
 
 function titleForMode(mode: string, id: string): string {
+  // Synchronous fallback only — used when the entity fetch fails.
   const m = BRAIN_MODES.find((x) => x.value === mode);
-  return (m?.label ?? "Review") + " - " + id.slice(0, 12);
+  const shortId = id.length > 14 ? id.slice(0, 14) + "…" : id;
+  return `${m?.label ?? "Review"} — ${shortId}`;
+}
+
+/**
+ * Fetch the underlying entity (opportunity / creator / niche / product /
+ * resellable asset) and build a sidebar-friendly title from its real name
+ * instead of the raw ID. Falls back to titleForMode() if anything goes
+ * wrong — a slow API or a 404 should never block conversation creation.
+ *
+ * Output format: "<Mode label>: <entity name>"
+ *   e.g. "Opportunity: Notion second-brain for indie SaaS founders"
+ *        "Creator: Sarah Chen (@sarahbuilds)"
+ *        "Niche: Notion Templates"
+ */
+async function resolveTitleForMode(mode: string, id: string): Promise<string> {
+  const modeLabel = BRAIN_MODES.find((x) => x.value === mode)?.label ?? "Review";
+  const TITLE_MAX = 120;
+  const trim = (s: string) => (s.length > TITLE_MAX ? s.slice(0, TITLE_MAX - 1) + "…" : s);
+
+  try {
+    switch (mode) {
+      case "opportunity":
+      case "build_plan": {
+        const res = await api.get<{ opportunity: { title: string } }>(
+          `/api/opportunities/${encodeURIComponent(id)}`,
+        );
+        if (res?.opportunity?.title) return trim(`${modeLabel}: ${res.opportunity.title}`);
+        break;
+      }
+      case "replicate": {
+        // Replicate can be anchored on either a product or an opportunity.
+        // Try product first (the more common entry point); fall back to
+        // opportunity. We deliberately don't surface 404 noise from the
+        // first attempt — only the final failure falls through to the
+        // catch.
+        try {
+          const res = await api.get<{ product: { title: string } }>(
+            `/api/products/${encodeURIComponent(id)}`,
+          );
+          if (res?.product?.title) return trim(`${modeLabel}: ${res.product.title}`);
+        } catch {
+          /* try opportunity */
+        }
+        const res = await api.get<{ opportunity: { title: string } }>(
+          `/api/opportunities/${encodeURIComponent(id)}`,
+        );
+        if (res?.opportunity?.title) return trim(`${modeLabel}: ${res.opportunity.title}`);
+        break;
+      }
+      case "creator": {
+        const res = await api.get<{
+          creator: { displayName: string; handle: string };
+        }>(`/api/creators/${encodeURIComponent(id)}`);
+        if (res?.creator) {
+          const name = res.creator.displayName || res.creator.handle;
+          const handle = res.creator.handle ? ` (@${res.creator.handle})` : "";
+          return trim(`${modeLabel}: ${name}${handle}`);
+        }
+        break;
+      }
+      case "niche": {
+        const res = await api.get<{ niche: { label: string } }>(
+          `/api/niches/${encodeURIComponent(id)}`,
+        );
+        if (res?.niche?.label) return trim(`${modeLabel}: ${res.niche.label}`);
+        break;
+      }
+      case "dataset_review": {
+        // No GET /api/resellable/[id] exists. Pull the list and find by id.
+        // The list is small (typically <100 assets) so this is cheap.
+        const res = await api.get<{ assets: { id: string; title: string }[] }>(`/api/resellable`);
+        const asset = res?.assets?.find((a) => a.id === id);
+        if (asset?.title) return trim(`${modeLabel}: ${asset.title}`);
+        break;
+      }
+      default:
+        break;
+    }
+  } catch {
+    /* fall through to sync fallback */
+  }
+  return titleForMode(mode, id);
 }

@@ -2,14 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
-import {
-  Archive,
-  CircleDashed,
-  CircleDot,
-  Hammer,
-  Rocket,
-  XCircle,
-} from "lucide-react";
+import { Archive, CircleDashed, CircleDot, Hammer, Rocket, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,8 +104,7 @@ export function StatusPicker({
   const [isPending, startTransition] = useTransition();
 
   const meta = STATUS_META[current];
-  const label =
-    PRODUCT_STATUSES.find((s) => s.value === current)?.label ?? current;
+  const label = PRODUCT_STATUSES.find((s) => s.value === current)?.label ?? current;
   const Icon = meta.icon;
 
   async function setStatus(next: Status) {
@@ -139,9 +131,7 @@ export function StatusPicker({
     startTransition(async () => {
       try {
         await api.patch(`/api/opportunities/${opportunityId}`, { status: next });
-        toast.success(
-          `Marked as ${PRODUCT_STATUSES.find((s) => s.value === next)?.label ?? next}`,
-        );
+        toast.success(`Marked as ${PRODUCT_STATUSES.find((s) => s.value === next)?.label ?? next}`);
       } catch (err) {
         setCurrent(prev);
         onChange?.(prev);
@@ -169,24 +159,14 @@ export function StatusPicker({
           Pipeline
         </DropdownMenuLabel>
         {PIPELINE.map((s) => (
-          <StatusItem
-            key={s}
-            value={s}
-            current={current}
-            onSelect={() => setStatus(s)}
-          />
+          <StatusItem key={s} value={s} current={current} onSelect={() => setStatus(s)} />
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-slate-500">
           Terminal
         </DropdownMenuLabel>
         {TERMINAL.map((s) => (
-          <StatusItem
-            key={s}
-            value={s}
-            current={current}
-            onSelect={() => setStatus(s)}
-          />
+          <StatusItem key={s} value={s} current={current} onSelect={() => setStatus(s)} />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -68,7 +68,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .set({ status: "launched", updatedAt: new Date() })
         .where(eq(opportunities.id, params.id));
     }
-    return ok({ product: existing, opportunity: { ...opp, status: "launched" }, alreadyLaunched: true });
+    return ok({
+      product: existing,
+      opportunity: { ...opp, status: "launched" },
+      alreadyLaunched: true,
+    });
   }
 
   const now = new Date();
