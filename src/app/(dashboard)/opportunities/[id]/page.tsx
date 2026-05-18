@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -23,6 +23,8 @@ import { ScoreBadge } from "@/components/shared/score-badge";
 import { ScoreBar } from "@/components/shared/score-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { AnnotationsThread } from "@/components/opportunity/annotations";
+import { StatusPicker } from "@/components/opportunity/status-picker";
+import { LaunchProductDialog } from "@/components/opportunity/launch-product-dialog";
 import { useApi } from "@/lib/hooks/use-api";
 import { api } from "@/lib/api-client/fetcher";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
@@ -152,6 +154,39 @@ export default function OpportunityDetailPage() {
 
   const [votes, setVotes] = useState({ up: 0, down: 0 });
   const [voting, setVoting] = useState<"up" | "down" | null>(null);
+  // Launch flow: when the user picks "launched" on the StatusPicker we
+  // pop a dialog to capture the launch URL + platform, then have the
+  // dialog hit the dedicated /launch endpoint (which both creates the
+  // product row and flips opp.status). The picker stays on its previous
+  // value until the dialog confirms.
+  const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
+  // The intercept handler returns a promise so the picker can await our
+  // dialog flow. We resolve it from the dialog's onLaunched callback.
+  const launchResolverRef = useRef<((accepted: boolean) => void) | null>(null);
+
+  function handleLaunchIntercept(next: string): Promise<boolean> {
+    if (next !== "launched") return Promise.resolve(true);
+    setLaunchDialogOpen(true);
+    return new Promise<boolean>((resolve) => {
+      launchResolverRef.current = resolve;
+    });
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    setLaunchDialogOpen(open);
+    // Closing without launching = user cancelled; tell the picker.
+    if (!open && launchResolverRef.current) {
+      launchResolverRef.current(false);
+      launchResolverRef.current = null;
+    }
+  }
+
+  function handleLaunched() {
+    if (launchResolverRef.current) {
+      launchResolverRef.current(true);
+      launchResolverRef.current = null;
+    }
+  }
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading opportunity…</div>;
   if (!opp) return <div className="p-6 text-sm text-slate-400">Opportunity not found.</div>;
@@ -239,14 +274,20 @@ export default function OpportunityDetailPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <ScoreBadge score={opp.score} size="lg" />
         <Badge variant="outline">{opp.niche.replace(/_/g, " ")}</Badge>
         <Badge variant="outline">{opp.opportunityType.replace(/_/g, " ")}</Badge>
         <Badge variant="outline">
           <Workflow className="mr-1 h-3 w-3" /> {opp.buildEffort.replace(/_/g, " ")}
         </Badge>
-        <Badge variant="info">{opp.status}</Badge>
+        <StatusPicker
+          opportunityId={opp.id}
+          initial={opp.status as Parameters<typeof StatusPicker>[0]["initial"]}
+          interceptStatuses={["launched"]}
+          onIntercept={handleLaunchIntercept}
+          compact
+        />
         <Badge variant="success" className="font-mono">
           proj. {formatUsd(opp.projectedRevenueUsd, { compact: true })}
         </Badge>
@@ -406,11 +447,28 @@ export default function OpportunityDetailPage() {
               <Row label="Updated" value={timeAgo(opp.updatedAt)} />
               <Row label="By" value={opp.createdBy === "system" ? "AI" : opp.createdBy} />
               <Row label="Niche" value={opp.niche.replace(/_/g, " ")} />
-              <Row label="Status" value={opp.status} />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500">Status</span>
+                <StatusPicker
+                  opportunityId={opp.id}
+                  initial={opp.status as Parameters<typeof StatusPicker>[0]["initial"]}
+                  interceptStatuses={["launched"]}
+                  onIntercept={handleLaunchIntercept}
+                  compact
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <LaunchProductDialog
+        open={launchDialogOpen}
+        onOpenChange={handleDialogOpenChange}
+        opportunityId={opp.id}
+        opportunityTitle={opp.title}
+        onLaunched={handleLaunched}
+      />
     </>
   );
 }

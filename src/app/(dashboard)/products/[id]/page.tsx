@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { useApi } from "@/lib/hooks/use-api";
+import { api } from "@/lib/api-client/fetcher";
 import { formatUsd, formatNumber, formatRange, timeAgo } from "@/lib/utils/format";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -49,27 +50,22 @@ export default function ProductDetailPage() {
   const [promoting, setPromoting] = useState(false);
 
   const handlePromote = async () => {
-    if (!product) return;
+    if (!product || promoting) return;
     setPromoting(true);
     try {
-      const res = await fetch("/api/opportunities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: `${product.title} — replication play`,
-          summary: `Replicate ${product.title} by ${product.creator ?? "unknown"} in the ${product.niche.replace(/_/g, " ")} niche.`,
-          niche: product.niche,
-          opportunityType: "replication",
-          buildEffort: "week",
-          projectedRevenueUsd: product.estMonthlyRevenueHigh ?? 1000,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      toast.success("Opportunity created!");
-      router.push(`/opportunities/${data.data.opportunity.id}`);
-    } catch {
-      toast.error("Failed to promote");
+      // Uses the dedicated endpoint instead of POST /api/opportunities so
+      // the resulting opportunity carries sourceProductIds: [product.id],
+      // a baseline 5-dimension score breakdown, and the proper "Replicate:"
+      // title format. The generic create endpoint dropped all of that on
+      // the floor.
+      const res = await api.post<{ opportunity: { id: string; title: string } }>(
+        `/api/products/${product.id}/promote-to-opportunity`,
+      );
+      if (!res?.opportunity) throw new Error("Empty response");
+      toast.success("Tracked as opportunity", { description: res.opportunity.title });
+      router.push(`/opportunities/${res.opportunity.id}`);
+    } catch (err) {
+      toast.error("Couldn't promote: " + (err as Error).message);
     } finally {
       setPromoting(false);
     }
