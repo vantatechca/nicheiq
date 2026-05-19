@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
 import { NICHE_LIST, SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import { formatUsd, formatNumber, formatRange } from "@/lib/utils/format";
-import { Rocket, Star, Users } from "lucide-react";
+import { FileDown, Rocket, Star, Users } from "lucide-react";
 import type { Product } from "@/lib/types";
 
 type ViewMode = "mine" | "market" | "all";
@@ -86,6 +86,19 @@ export function ProductsView({ products, total, counts, filters }: Props) {
             : filters.view === "market"
               ? `${products.length} of ${counts.market} market products tracked across all sources.`
               : `${products.length} of ${total} tracked across all sources.`
+        }
+        actions={
+          filters.view === "mine" && counts.mine > 0 ? (
+            // "Export PDF" only appears in the Mine view, and only when
+            // there's something to export. Opens the print-optimized
+            // page in a new tab; the page auto-fires window.print() so
+            // the user just confirms "Save as PDF" in the browser dialog.
+            <Button asChild size="sm" variant="outline">
+              <Link href="/portfolio-pdf" target="_blank" rel="noopener">
+                <FileDown className="mr-1 h-4 w-4" /> Export PDF
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
