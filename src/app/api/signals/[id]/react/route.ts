@@ -85,11 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     payload: {
       kind: parsed.data.kind,
       direction:
-        parsed.data.kind === "vote_up"
-          ? "up"
-          : parsed.data.kind === "vote_down"
-            ? "down"
-            : null,
+        parsed.data.kind === "vote_up" ? "up" : parsed.data.kind === "vote_down" ? "down" : null,
       signalTitle: signal.title,
     },
   });
