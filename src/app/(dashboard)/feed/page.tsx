@@ -2,24 +2,94 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bookmark, Pause, Play, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bookmark, Package, Pause, Play, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
-import { NICHE_LIST } from "@/lib/utils/constants";
+import { NICHE_LIST, SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import { timeAgo, formatNumber } from "@/lib/utils/format";
 import { useSse } from "@/lib/hooks/use-sse";
 import { useApi } from "@/lib/hooks/use-api";
+import { api } from "@/lib/api-client/fetcher";
 import { toast } from "sonner";
 import type { Signal } from "@/lib/types";
 
 export default function FeedPage() {
+  const router = useRouter();
   const [niche, setNiche] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<string | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Per-signal pending state so the button can disable + spin without
+  // affecting other rows. We keep a Set of ids currently in flight.
+  const [promoting, setPromoting] = useState<Set<string>>(new Set());
+  // Tracks which signals the current session already saved, so the
+  // Bookmark icon can flip to "filled" without a re-fetch. This is
+  // session-local; on reload we'd need a /api/signals?saved=1 to
+  // restore — out of scope for this pass.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  // Tracks last vote direction per signal so the thumbs-up/down icons
+  // can colour to indicate the recorded vote.
+  const [votes, setVotes] = useState<Record<string, "up" | "down">>({});
+
+  async function reactToSignal(signalId: string, kind: "vote_up" | "vote_down" | "save") {
+    try {
+      const res = await api.post<{ kind: string; alreadySaved: boolean }>(
+        `/api/signals/${signalId}/react`,
+        { kind },
+      );
+      if (kind === "save") {
+        if (res?.alreadySaved) {
+          toast.message("Already saved");
+        } else {
+          setSavedIds((prev) => new Set(prev).add(signalId));
+          toast.success("Saved");
+        }
+      } else {
+        const dir = kind === "vote_up" ? "up" : "down";
+        setVotes((prev) => ({ ...prev, [signalId]: dir }));
+        toast.success(dir === "up" ? "Voted up" : "Voted down");
+      }
+    } catch (err) {
+      toast.error("Couldn't react: " + (err as Error).message);
+    }
+  }
+
+  async function promoteToProduct(signalId: string) {
+    if (promoting.has(signalId)) return;
+    setPromoting((prev) => new Set(prev).add(signalId));
+    try {
+      const res = await api.post<{
+        product: { id: string; title: string } | null;
+        alreadyExisted: boolean;
+      }>(`/api/signals/${signalId}/promote-to-product`);
+      if (res?.product) {
+        const verb = res.alreadyExisted ? "Already tracked" : "Tracked as product";
+        // Use a richer toast: clickable to jump straight to the product page.
+        toast.success(verb, {
+          description: res.product.title,
+          action: {
+            label: "Open",
+            onClick: () => router.push(`/products/${res.product!.id}`),
+          },
+        });
+      } else {
+        toast.error("Promote failed — empty response");
+      }
+    } catch (err) {
+      toast.error("Couldn't promote: " + (err as Error).message);
+    } finally {
+      setPromoting((prev) => {
+        const next = new Set(prev);
+        next.delete(signalId);
+        return next;
+      });
+    }
+  }
 
   // Live updates over SSE (real-time).
   const { items: liveItems, connected } = useSse<Signal>({
@@ -39,6 +109,7 @@ export default function FeedPage() {
   let filtered = dedup;
   if (niche) filtered = filtered.filter((s) => s.niche === niche);
   if (type) filtered = filtered.filter((s) => s.signalType === type);
+  if (platform) filtered = filtered.filter((s) => s.sourcePlatform === platform);
   if (minScore) filtered = filtered.filter((s) => s.score >= minScore);
 
   const signalTypes = [
@@ -116,6 +187,15 @@ export default function FeedPage() {
             onChange={setType}
             emptyLabel="All types"
           />
+          <FilterChips
+            options={SOURCE_PLATFORMS.map((p) => ({
+              value: p.value,
+              label: `${p.icon} ${p.label}`,
+            }))}
+            value={platform}
+            onChange={setPlatform}
+            emptyLabel="All platforms"
+          />
         </div>
       </Card>
 
@@ -153,26 +233,49 @@ export default function FeedPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  onClick={() => toast.success("Voted up")}
+                  className={`h-7 w-7 ${
+                    votes[s.id] === "up" ? "text-emerald-300 hover:text-emerald-200" : ""
+                  }`}
+                  onClick={() => reactToSignal(s.id, "vote_up")}
+                  aria-label="Vote up"
+                  title="Vote up"
                 >
                   <ThumbsUp className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  onClick={() => toast.success("Voted down")}
+                  className={`h-7 w-7 ${
+                    votes[s.id] === "down" ? "text-rose-300 hover:text-rose-200" : ""
+                  }`}
+                  onClick={() => reactToSignal(s.id, "vote_down")}
+                  aria-label="Vote down"
+                  title="Vote down"
                 >
                   <ThumbsDown className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  onClick={() => toast.success("Saved")}
+                  className={`h-7 w-7 ${
+                    savedIds.has(s.id) ? "text-amber-300 hover:text-amber-200" : ""
+                  }`}
+                  onClick={() => reactToSignal(s.id, "save")}
+                  aria-label="Save signal"
+                  title={savedIds.has(s.id) ? "Saved" : "Save for later"}
                 >
-                  <Bookmark className="h-3 w-3" />
+                  <Bookmark className={`h-3 w-3 ${savedIds.has(s.id) ? "fill-current" : ""}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 hover:text-emerald-300"
+                  disabled={promoting.has(s.id)}
+                  onClick={() => promoteToProduct(s.id)}
+                  aria-label="Promote to product"
+                  title="Track as product"
+                >
+                  <Package className={`h-3 w-3 ${promoting.has(s.id) ? "animate-pulse" : ""}`} />
                 </Button>
                 <Button asChild variant="ghost" size="icon" className="h-7 w-7">
                   <Link href={`/brain?mode=global&signal=${s.id}`}>

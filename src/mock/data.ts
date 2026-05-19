@@ -638,6 +638,10 @@ for (let i = 0; i < 80; i++) {
     niche,
     tags: tags[idx % tags.length]!,
     thumbnailUrl: `https://picsum.photos/seed/${niche}-${i}/400/300`,
+    // Seed products are market products by definition — they exist
+    // to populate the catalog from external platforms, not to represent
+    // anything you launched. Always null.
+    opportunityId: null,
     firstSeenAt: isoMinusDays(randInt(i + 79, 4, 90)),
     lastSeenAt: isoMinusHours(randInt(i + 83, 1, 48)),
   });

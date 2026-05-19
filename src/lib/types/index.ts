@@ -36,6 +36,11 @@ export type Product = {
   niche: NicheValue;
   tags: string[];
   thumbnailUrl: string | null;
+  // Set when this product was launched from an opportunity (via the
+  // launch dialog on /opportunities/[id]). Null for crawled/promoted
+  // competitor products. The /products view uses this to split "Mine"
+  // from "Competitors".
+  opportunityId: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
 };
