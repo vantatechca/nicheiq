@@ -10,7 +10,7 @@ export type Events = {
   "crawl/source.requested": { data: { sourceId: string; runId?: string } };
   "product/enrich.requested": { data: { productId: string } };
   "opportunity/score.requested": { data: { opportunityId: string } };
-  "opportunity/synthesize.batch": { data: Record<string, never> };
+  "opportunity/synthesize.batch": { data: { niche?: string } };
   "digest/generate.requested": { data: { cadence: "daily" | "weekly" | "monthly" } };
   "trend/snapshot.daily": { data: Record<string, never> };
   "patterns/refresh.nightly": { data: Record<string, never> };

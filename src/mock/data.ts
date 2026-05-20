@@ -22,7 +22,10 @@ import type {
 import type { NicheValue, SourcePlatform } from "@/lib/utils/constants";
 import { NICHE_LIST } from "@/lib/utils/constants";
 
-const NOW = new Date("2026-04-26T19:40:00Z");
+// Anchor all relative mock timestamps to the current time so charts, digests,
+// and activity feeds never go stale. Override with MOCK_NOW (ISO string) for
+// deterministic tests/snapshots.
+const NOW = process.env.MOCK_NOW ? new Date(process.env.MOCK_NOW) : new Date();
 const isoMinusDays = (d: number, h = 0) =>
   new Date(NOW.getTime() - d * 86_400_000 - h * 3_600_000).toISOString();
 const isoMinusHours = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();

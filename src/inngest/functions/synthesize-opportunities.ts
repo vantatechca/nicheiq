@@ -54,11 +54,37 @@ function stripJsonFences(text: string): string {
 export const synthesizeOpportunities = inngest.createFunction(
   { id: "synthesize-opportunities", retries: 1 },
   { cron: "0 */4 * * *" },
-  async ({ step, logger }) => {
+  async ({ event, step, logger }) => {
+    // Optional niche scope. When the event carries a niche (manual "Synthesize
+    // new" while filtered to one niche), synthesize ONLY that niche and look
+    // back further — a single niche often has no signals in the last 24h, so a
+    // tight window would return nothing. The scheduled cron sends no niche and
+    // keeps the original 24h / all-niches behavior.
+    const scopedNiche = event?.data?.niche;
+    const lookbackMs = scopedNiche ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
     // Step 1: niche groups from recent signals.
     const nicheGroups = await step.run("fetch-signals-by-niche", async () => {
       const db = getDb();
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const since = new Date(Date.now() - lookbackMs);
+
+      if (scopedNiche) {
+        // Single-niche path: skip the grouping query entirely.
+        const topSignals = await db
+          .select({ id: signals.id, title: signals.title, score: signals.score })
+          .from(signals)
+          .where(
+            and(
+              gt(signals.processedAt, since),
+              eq(signals.niche, scopedNiche as (typeof signals.niche.enumValues)[number]),
+            ),
+          )
+          .orderBy(desc(signals.score))
+          .limit(15);
+        logger.info(`[synthesize] scoped to ${scopedNiche}: ${topSignals.length} signals`);
+        if (topSignals.length === 0) return [];
+        return [{ niche: scopedNiche, count: topSignals.length, topSignals }];
+      }
 
       const nicheCounts = await db
         .select({
@@ -185,30 +211,71 @@ Propose a specific digital product. Output strictly this JSON shape:
     // enum casts here are safe (no more "best guess" strings reaching the DB).
     const saved = await step.run("persist-opportunities", async () => {
       const db = getDb();
-      const rows = proposals.map((p) => ({
-        id: crypto.randomUUID(),
-        title: p.title,
-        summary: p.summary,
-        niche: p.niche as (typeof nicheEnum.enumValues)[number],
-        opportunityType: p.opportunityType,
-        buildEffort: p.buildEffort,
-        projectedRevenueUsd: p.projectedRevenueUsd,
-        status: "tracking" as const,
-        sourceProductIds: [] as string[],
-        sourceSignalIds: p.sourceSignalIds,
-        aiRationale: p.aiRationale,
-        aiBuildPlan: p.aiBuildPlan,
-        score: p.score,
-        scoreBreakdown: p.scoreBreakdown,
-        createdBy: "system",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
 
-      const result = await db.insert(opportunities).values(rows).onConflictDoNothing();
-      return result.rowCount ?? 0;
+      // Dedupe guard. Each run mints a new UUID, so onConflictDoNothing never
+      // fires on the PK — without this, the cron re-proposing the same product
+      // (e.g. "SecurityAudit.ai") inserts a near-clone every 4 hours. Skip a
+      // proposal if an opportunity with the same normalized title already
+      // exists in that niche. Normalize on lower(trim()) so casing/whitespace
+      // variants collapse.
+      const norm = (s: string) => s.trim().toLowerCase();
+
+      const existing = await db
+        .select({ title: opportunities.title, niche: opportunities.niche })
+        .from(opportunities);
+      const seen = new Set(existing.map((e) => `${e.niche}::${norm(e.title)}`));
+
+      const rows = proposals
+        .filter((p) => {
+          const key = `${p.niche}::${norm(p.title)}`;
+          if (seen.has(key)) return false;
+          seen.add(key); // also dedupe within this same batch
+          return true;
+        })
+        .map((p) => ({
+          id: crypto.randomUUID(),
+          title: p.title,
+          summary: p.summary,
+          niche: p.niche as (typeof nicheEnum.enumValues)[number],
+          opportunityType: p.opportunityType,
+          buildEffort: p.buildEffort,
+          projectedRevenueUsd: p.projectedRevenueUsd,
+          status: "tracking" as const,
+          sourceProductIds: [] as string[],
+          sourceSignalIds: p.sourceSignalIds,
+          aiRationale: p.aiRationale,
+          aiBuildPlan: p.aiBuildPlan,
+          score: p.score,
+          scoreBreakdown: p.scoreBreakdown,
+          createdBy: "system",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+      const skipped = proposals.length - rows.length;
+      if (skipped > 0) logger.info(`[synthesize] skipped ${skipped} duplicate proposal(s)`);
+      if (rows.length === 0) return { count: 0, ids: [] as string[] };
+
+      await db.insert(opportunities).values(rows).onConflictDoNothing();
+      return { count: rows.length, ids: rows.map((r) => r.id) };
     });
 
-    return { nicheGroups: nicheGroups.length, proposed: proposals.length, saved };
+    // Route every freshly synthesized opportunity through the REAL scoring
+    // engine. Synthesis persists the model's self-reported score (anchored on
+    // the prompt example, hence the flat ~76 everywhere); this recomputes it
+    // from linked signals, niche trend growth, golden rules, and feedback
+    // patterns so scores actually differentiate. Fire-and-forget events —
+    // score-opportunity picks them up with its own concurrency limit.
+    if (saved.ids.length > 0) {
+      await step.sendEvent(
+        "request-scoring",
+        saved.ids.map((opportunityId) => ({
+          name: "opportunity/score.requested" as const,
+          data: { opportunityId },
+        })),
+      );
+    }
+
+    return { nicheGroups: nicheGroups.length, proposed: proposals.length, saved: saved.count };
   },
 );
