@@ -44,8 +44,20 @@ export async function GET(_req: NextRequest) {
     .orderBy(sql`DATE(${opportunities.createdAt})`);
 
   // Pad to 14 points so the chart always renders smoothly even with sparse data.
-  const sparklineValues = sparkline.map((s) => (s.avg ? Math.round(Number(s.avg)) : 0));
-  while (sparklineValues.length < 14) sparklineValues.unshift(avgScore);
+  const rawValues = sparkline.map((s) => (s.avg ? Math.round(Number(s.avg)) : 0));
+  while (rawValues.length < 14) rawValues.unshift(avgScore);
 
-  return ok({ buckets, sparkline: sparklineValues, avg: avgScore });
+  // Shape as { date, value } objects — the client chart and ScoresResponse
+  // type expect that, not a bare number array.
+  const today = new Date();
+  const sparklineValues = rawValues.slice(-14).map((value, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (13 - i));
+    return { date: d.toISOString().slice(0, 10), value };
+  });
+
+  // Total across all buckets — the client uses it for bucket percentages.
+  const total = buckets.reduce((sum, b) => sum + b.count, 0);
+
+  return ok({ buckets, sparkline: sparklineValues, avg: avgScore, total });
 }

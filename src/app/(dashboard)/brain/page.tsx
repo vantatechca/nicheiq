@@ -424,11 +424,10 @@ async function resolveTitleForMode(mode: string, id: string): Promise<string> {
         break;
       }
       case "dataset_review": {
-        // No GET /api/resellable/[id] exists. Pull the list and find by id.
-        // The list is small (typically <100 assets) so this is cheap.
-        const res = await api.get<{ assets: { id: string; title: string }[] }>(`/api/resellable`);
-        const asset = res?.assets?.find((a) => a.id === id);
-        if (asset?.title) return trim(`${modeLabel}: ${asset.title}`);
+        const res = await api.get<{ asset: { title: string } }>(
+          `/api/resellable/${encodeURIComponent(id)}`,
+        );
+        if (res?.asset?.title) return trim(`${modeLabel}: ${res.asset.title}`);
         break;
       }
       default:

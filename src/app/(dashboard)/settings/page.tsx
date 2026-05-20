@@ -170,6 +170,48 @@ export default function SettingsPage() {
     }
   }
 
+  async function exportResellableCsv() {
+    setExporting("resellable");
+    try {
+      const assets = await fetchAll<{
+        id: string;
+        title: string;
+        assetType: string;
+        sourcePlatform: string;
+        sourceUrl: string;
+        niche: string | null;
+        askingPriceUsd: number | null;
+        monthlyRevenueUsd: number | null;
+        license: string | null;
+        status: string;
+        notes: string;
+        createdAt: string;
+      }>("/api/resellable", "assets");
+      downloadCsv(
+        `nicheiq-resellable-${today}.csv`,
+        assets.map((a) => ({
+          id: a.id,
+          title: a.title,
+          assetType: a.assetType,
+          sourcePlatform: a.sourcePlatform,
+          sourceUrl: a.sourceUrl,
+          niche: a.niche ?? "",
+          askingPriceUsd: a.askingPriceUsd ?? "",
+          monthlyRevenueUsd: a.monthlyRevenueUsd ?? "",
+          license: a.license ?? "",
+          status: a.status,
+          notes: a.notes ?? "",
+          createdAt: a.createdAt,
+        })),
+      );
+      toast.success("Resellable assets CSV downloaded");
+    } catch (err) {
+      toast.error(`Export failed: ${(err as Error).message}`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -323,6 +365,13 @@ export default function SettingsPage() {
                 </Button>
                 <Button variant="outline" disabled={exporting !== null} onClick={exportCreatorsCsv}>
                   {exporting === "creators" ? "Exporting…" : "Export creators (.csv)"}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={exporting !== null}
+                  onClick={exportResellableCsv}
+                >
+                  {exporting === "resellable" ? "Exporting…" : "Export resellable (.csv)"}
                 </Button>
               </div>
               <div className="mt-3 rounded-md border border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-400">
