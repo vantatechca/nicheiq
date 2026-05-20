@@ -175,12 +175,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
                 });
               }}
             />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSynthesize}
-              disabled={synthesizing}
-            >
+            <Button size="sm" variant="outline" onClick={handleSynthesize} disabled={synthesizing}>
               <Sparkles className="mr-1 h-4 w-4" />
               {synthesizing
                 ? "Synthesizing…"
