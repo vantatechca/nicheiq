@@ -111,6 +111,34 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     setSelected(new Set());
   }
 
+  const [synthesizing, setSynthesizing] = useState(false);
+  async function handleSynthesize() {
+    if (synthesizing) return;
+    setSynthesizing(true);
+    const scopedNiche = filters.niche;
+    try {
+      const res = await fetch("/api/opportunities/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scopedNiche ? { niche: scopedNiche } : {}),
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const body = await res.json();
+      const scopeLabel = scopedNiche ? ` in ${scopedNiche.replace(/_/g, " ")}` : "";
+      if (body?.job?.status === "skipped_mock") {
+        toast.info("Synthesis runs against live data only — nothing to do in mock mode.");
+      } else {
+        toast.success(`Synthesizing new opportunities${scopeLabel} — they'll appear in a moment.`);
+        // Refresh the list after the job has had time to persist.
+        setTimeout(() => startTransition(() => router.refresh()), 8000);
+      }
+    } catch (err) {
+      toast.error(`Couldn't start synthesis: ${(err as Error).message}`);
+    } finally {
+      setSynthesizing(false);
+    }
+  }
+
   const filterCount =
     [filters.niche, filters.type, filters.effort, filters.status].filter(Boolean).length +
     (filters.minScore > 0 ? 1 : 0);
@@ -147,10 +175,13 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
                 });
               }}
             />
-            <Button size="sm" variant="outline" asChild>
-              <Link href="/brain">
-                <Sparkles className="mr-1 h-4 w-4" /> Synthesize new
-              </Link>
+            <Button size="sm" variant="outline" onClick={handleSynthesize} disabled={synthesizing}>
+              <Sparkles className="mr-1 h-4 w-4" />
+              {synthesizing
+                ? "Synthesizing…"
+                : filters.niche
+                  ? `Synthesize ${filters.niche.replace(/_/g, " ")}`
+                  : "Synthesize new"}
             </Button>
             <OpportunityCreateDialog />
           </>

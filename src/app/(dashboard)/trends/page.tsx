@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, SearchX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 import { RechartsLine } from "@/components/shared/recharts-line";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatNumber, formatPct } from "@/lib/utils/format";
@@ -29,7 +32,7 @@ export default function TrendsPage() {
 
   // Server-side niche filter; client-side search.
   const path = niche ? `/api/trends?niche=${niche}` : "/api/trends";
-  const { data, loading } = useApi<{ trends: Trend[] }>(path);
+  const { data, loading, error, refetch } = useApi<{ trends: Trend[] }>(path);
 
   let rows = data?.trends ?? [];
   if (search.trim()) {
@@ -64,10 +67,29 @@ export default function TrendsPage() {
         <div className="text-xs text-slate-500">Loading trends…</div>
       ) : null}
 
-      {!loading && rows.length === 0 ? (
-        <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
-          No trends match. Loosen filters or wait for the next crawl.
-        </div>
+      {!loading && error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn’t load trends"
+          description={
+            error.status === 401
+              ? "Your session expired. Sign in again to continue."
+              : `${error.message} (${error.status || "network error"})`
+          }
+          action={
+            <Button variant="outline" size="sm" onClick={refetch}>
+              Retry
+            </Button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && rows.length === 0 ? (
+        <EmptyState
+          icon={SearchX}
+          title="No trends match"
+          description="Loosen filters or wait for the next crawl."
+        />
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

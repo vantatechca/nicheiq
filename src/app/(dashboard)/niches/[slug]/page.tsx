@@ -93,7 +93,7 @@ export default function NicheDetailPage() {
         description={n.description}
         actions={
           <Button size="sm" asChild>
-            <Link href={`/brain?mode=niche&niche=${n.slug}`}>
+            <Link href={`/brain?mode=niche&id=${n.slug}`}>
               <Sparkles className="mr-1 h-4 w-4" /> Niche deep-dive
             </Link>
           </Button>
@@ -149,7 +149,7 @@ export default function NicheDetailPage() {
                   <div className="flex items-center gap-2">
                     <ScoreBadge score={o.score} size="sm" />
                     <span className="text-[10px] uppercase text-slate-500">
-                      {o.opportunityType.replace(/_/g, " ")}
+                      {o.opportunityType.replace(/_/g, " ")} play
                     </span>
                   </div>
                   <div className="mt-1 line-clamp-1 text-sm font-medium">{o.title}</div>

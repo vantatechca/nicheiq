@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { hash } from "bcryptjs";
+import { sql } from "drizzle-orm";
 import { getDb } from "./client";
 import {
   users,
@@ -159,7 +160,17 @@ async function main() {
         snapshotDate: new Date(t.snapshotDate),
       })),
     )
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: trends.id,
+      set: {
+        momentumScore: sql`excluded.momentum_score`,
+        volume7d: sql`excluded.volume_7d`,
+        volume30d: sql`excluded.volume_30d`,
+        growthPct: sql`excluded.growth_pct`,
+        series: sql`excluded.series`,
+        snapshotDate: sql`excluded.snapshot_date`,
+      },
+    });
   console.log(`✓ trends (${mockTrends.length})`);
 
   await db
