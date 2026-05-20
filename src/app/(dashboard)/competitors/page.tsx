@@ -41,9 +41,14 @@ interface Creator {
 }
 
 export default function CompetitorsPage() {
-  const { data: competitorsData, loading: cLoading } = useApi<{ competitors: Competitor[] }>(
-    "/api/competitors",
-  );
+  const {
+    data: competitorsData,
+    loading: cLoading,
+    error: cError,
+    refetch,
+  } = useApi<{
+    competitors: Competitor[];
+  }>("/api/competitors");
   const { data: creatorsData, loading: crLoading } = useApi<{ creators: Creator[] }>(
     "/api/creators?limit=200",
   );
@@ -69,11 +74,20 @@ export default function CompetitorsPage() {
         description={`Curated deep-dive list — ${competitors.length} creators.`}
       />
 
-      {loading && competitors.length === 0 ? (
+      {cError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">
+          Couldn&apos;t load competitors: {cError.message} ({cError.status || "network error"}).{" "}
+          <button onClick={refetch} className="underline">
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {!cError && loading && competitors.length === 0 ? (
         <div className="text-xs text-slate-500">Loading competitors…</div>
       ) : null}
 
-      {!loading && competitors.length === 0 ? (
+      {!cError && !loading && competitors.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
           No competitors tracked yet. Add one from any creator&apos;s playbook page.
         </div>

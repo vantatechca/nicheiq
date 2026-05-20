@@ -4,6 +4,15 @@ import { resellableSchema } from "@/lib/utils/validation";
 import { requireSession } from "@/lib/auth/session";
 import { getResellable, updateResellable } from "@/lib/repos/resellable";
 
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
+  const asset = await getResellable(params.id);
+  if (!asset) return notFound();
+  return ok({ asset });
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await requireSession();
   if (!session) return unauthorized();

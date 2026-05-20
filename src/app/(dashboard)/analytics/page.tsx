@@ -32,7 +32,7 @@ interface SourceRow {
 }
 
 interface SourcesResponse {
-  sources: SourceRow[];
+  contribution: SourceRow[];
 }
 
 interface NicheRow {
@@ -60,21 +60,34 @@ interface PatternsResponse {
 }
 
 export default function AnalyticsPage() {
-  const { data: scoresData, loading: scoresLoading } =
-    useApi<ScoresResponse>("/api/analytics/scores");
-  const { data: sourcesData, loading: sourcesLoading } =
-    useApi<SourcesResponse>("/api/analytics/sources");
-  const { data: nichesData, loading: nichesLoading } =
-    useApi<NichesResponse>("/api/analytics/niches");
-  const { data: patternsData, loading: patternsLoading } =
-    useApi<PatternsResponse>("/api/analytics/patterns");
+  const {
+    data: scoresData,
+    loading: scoresLoading,
+    error: scoresError,
+  } = useApi<ScoresResponse>("/api/analytics/scores");
+  const {
+    data: sourcesData,
+    loading: sourcesLoading,
+    error: sourcesError,
+  } = useApi<SourcesResponse>("/api/analytics/sources");
+  const {
+    data: nichesData,
+    loading: nichesLoading,
+    error: nichesError,
+  } = useApi<NichesResponse>("/api/analytics/niches");
+  const {
+    data: patternsData,
+    loading: patternsLoading,
+    error: patternsError,
+  } = useApi<PatternsResponse>("/api/analytics/patterns");
 
   const buckets = scoresData?.buckets ?? [];
   const total = scoresData?.total ?? 0;
   const avg = scoresData?.avg ?? 0;
   const sparkline = scoresData?.sparkline ?? [];
 
-  const sourceContribution = (sourcesData?.sources ?? []).slice(0, 12);
+  // NOTE: the endpoint returns { contribution }, not { sources }.
+  const sourceContribution = (sourcesData?.contribution ?? []).slice(0, 12);
   const topSourceItems = sourceContribution[0]?.itemsTracked ?? 1;
 
   const nichePerf = (nichesData?.niches ?? []).slice(0, 12);
@@ -98,6 +111,11 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="scores">
+          {scoresError ? (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+              Couldn&apos;t load scores: {scoresError.message} ({scoresError.status || "network"}).
+            </div>
+          ) : null}
           {scoresLoading && buckets.length === 0 ? (
             <div className="text-xs text-slate-500">Loading scores…</div>
           ) : null}
@@ -153,6 +171,12 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="sources">
+          {sourcesError ? (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+              Couldn&apos;t load sources: {sourcesError.message} ({sourcesError.status || "network"}
+              ).
+            </div>
+          ) : null}
           {sourcesLoading && sourceContribution.length === 0 ? (
             <div className="text-xs text-slate-500">Loading sources…</div>
           ) : null}
@@ -183,6 +207,11 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="niches">
+          {nichesError ? (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+              Couldn&apos;t load niches: {nichesError.message} ({nichesError.status || "network"}).
+            </div>
+          ) : null}
           {nichesLoading && nichePerf.length === 0 ? (
             <div className="text-xs text-slate-500">Loading niches…</div>
           ) : null}
@@ -215,6 +244,12 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="patterns">
+          {patternsError ? (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+              Couldn&apos;t load patterns: {patternsError.message} (
+              {patternsError.status || "network"}).
+            </div>
+          ) : null}
           {patternsLoading && patterns.length === 0 ? (
             <div className="text-xs text-slate-500">Loading patterns…</div>
           ) : null}

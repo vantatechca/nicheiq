@@ -47,7 +47,9 @@ export default function ResellablePage() {
   const [tab, setTab] = useState("all");
 
   // Initial list via the new useApi pattern. refetch lets us re-pull after create.
-  const { data, refetch } = useApi<{ assets: ResellableAsset[] }>("/api/resellable");
+  const { data, loading, error, refetch } = useApi<{ assets: ResellableAsset[] }>(
+    "/api/resellable",
+  );
   const assets = data?.assets ?? [];
 
   // New-asset dialog state
@@ -141,7 +143,18 @@ export default function ResellablePage() {
           ))}
         </TabsList>
         <TabsContent value={tab} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.length === 0 && (
+          {error && (
+            <div className="col-span-full rounded-md border border-destructive/40 bg-destructive/5 p-6 text-center text-xs text-destructive">
+              Couldn&apos;t load assets: {error.message} ({error.status || "network error"}).{" "}
+              <button onClick={refetch} className="underline">
+                Retry
+              </button>
+            </div>
+          )}
+          {!error && loading && filtered.length === 0 && (
+            <div className="col-span-full p-6 text-center text-xs text-slate-500">Loading…</div>
+          )}
+          {!error && !loading && filtered.length === 0 && (
             <div className="col-span-full rounded-md border border-dashed border-slate-800 p-6 text-center text-xs text-slate-500">
               No assets in this status yet.
             </div>

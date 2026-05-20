@@ -8,14 +8,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
 import { useApi } from "@/lib/hooks/use-api";
 import { api } from "@/lib/api-client/fetcher";
 import { timeAgo } from "@/lib/utils/format";
 
+const RULE_TYPES = [
+  { value: "boost", label: "Boost" },
+  { value: "require", label: "Require" },
+  { value: "penalize", label: "Penalize" },
+  { value: "block", label: "Block" },
+] as const;
+type RuleTypeValue = (typeof RULE_TYPES)[number]["value"];
+
 interface GoldenRule {
   id: string;
-  ruleType: "block" | "boost" | "penalize" | "promote";
+  ruleType: "block" | "boost" | "penalize" | "require";
   label: string;
   description: string;
   keywords: string[];
@@ -35,8 +59,15 @@ interface FeedbackPattern {
 
 export default function RulesPage() {
   // Initial fetch + refetch on demand.
-  const { data: rulesData, refetch: refetchRules } = useApi<{ rules: GoldenRule[] }>("/api/rules");
-  const { data: patternsData } = useApi<{ patterns: FeedbackPattern[] }>("/api/rules/suggestions");
+  const {
+    data: rulesData,
+    error: rulesError,
+    refetch: refetchRules,
+  } = useApi<{ rules: GoldenRule[] }>("/api/rules");
+  // NOTE: the endpoint returns { suggestions }, not { patterns }.
+  const { data: patternsData } = useApi<{ suggestions: FeedbackPattern[] }>(
+    "/api/rules/suggestions",
+  );
 
   // Local optimistic state — flips immediately on toggle, then API patches in
   // the background. Falls back to the server value on refetch.
@@ -47,7 +78,68 @@ export default function RulesPage() {
     ...r,
     active: optimistic[r.id] ?? r.active,
   }));
-  const patterns = patternsData?.patterns ?? [];
+  const patterns = patternsData?.suggestions ?? [];
+
+  // Create-rule dialog state.
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [ruleType, setRuleType] = useState<RuleTypeValue>("boost");
+  const [label, setLabel] = useState("");
+  const [description, setDescription] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [weight, setWeight] = useState("0.5");
+
+  function resetForm() {
+    setRuleType("boost");
+    setLabel("");
+    setDescription("");
+    setKeywords("");
+    setWeight("0.5");
+  }
+
+  // Open the dialog pre-filled from an AI suggestion ("Promote to rule").
+  function promote(p: FeedbackPattern) {
+    setRuleType("boost");
+    setLabel(p.label);
+    setDescription(p.description);
+    setKeywords("");
+    setWeight("0.5");
+    setOpen(true);
+  }
+
+  async function createRule() {
+    if (label.trim().length < 2) {
+      toast.error("Label needs at least 2 characters");
+      return;
+    }
+    const w = Number(weight);
+    if (Number.isNaN(w) || w < 0 || w > 1) {
+      toast.error("Weight must be between 0 and 1");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post("/api/rules", {
+        label: label.trim(),
+        description: description.trim() || undefined,
+        ruleType,
+        keywords: keywords
+          .split(",")
+          .map((k) => k.trim())
+          .filter(Boolean),
+        weight: w,
+        active: true,
+      });
+      toast.success(`Rule "${label.trim()}" created`);
+      resetForm();
+      setOpen(false);
+      refetchRules();
+    } catch (err) {
+      toast.error((err as Error).message || "Create failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function toggle(id: string, currentActive: boolean) {
     const next = !currentActive;
@@ -85,7 +177,7 @@ export default function RulesPage() {
         title="Golden rules"
         description={`${activeCount} active · ${rules.length} total`}
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => setOpen(true)}>
             <Plus className="mr-1 h-4 w-4" /> New rule
           </Button>
         }
@@ -93,7 +185,16 @@ export default function RulesPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
-          {rules.length === 0 && (
+          {rulesError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-destructive">
+              Couldn&apos;t load rules: {rulesError.message} ({rulesError.status || "network error"}
+              ).{" "}
+              <button onClick={refetchRules} className="underline">
+                Retry
+              </button>
+            </div>
+          )}
+          {!rulesError && rules.length === 0 && (
             <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
               No rules yet. Create one to start shaping your feed.
             </div>
@@ -187,7 +288,12 @@ export default function RulesPage() {
                   <div className="mt-1 text-slate-500">{p.description}</div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-[10px] uppercase text-slate-500">{p.derivedFrom}</span>
-                    <Button size="sm" variant="ghost" className="h-6 text-xs">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs"
+                      onClick={() => promote(p)}
+                    >
                       Promote to rule
                     </Button>
                   </div>
@@ -217,6 +323,97 @@ export default function RulesPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) resetForm();
+          setOpen(o);
+        }}
+      >
+        <DialogContent className="border-slate-800 bg-slate-900 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New golden rule</DialogTitle>
+            <DialogDescription>
+              Rules shape scoring: boost or require what you want to see, penalize or block what you
+              don&apos;t. Matched against opportunity title, summary, niche, and rationale.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Type</Label>
+                <Select value={ruleType} onValueChange={(v) => setRuleType(v as RuleTypeValue)}>
+                  <SelectTrigger className="border-slate-800 bg-slate-950">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RULE_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Weight (0–1)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  className="border-slate-800 bg-slate-950"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Label</Label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder='e.g. "Boost AI agent tools"'
+                className="border-slate-800 bg-slate-950"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Keywords (comma-separated)</Label>
+              <Input
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+                placeholder="ai agent, autonomous, copilot"
+                className="border-slate-800 bg-slate-950"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Description (optional)</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Why this rule exists"
+                className="border-slate-800 bg-slate-950"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                setOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={createRule} disabled={saving}>
+              {saving ? "Creating…" : "Create rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
