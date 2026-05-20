@@ -97,6 +97,44 @@ export default function RulesPage() {
     setWeight("0.5");
   }
 
+  // "Test a new rule" preview panel — separate lightweight inputs.
+  const [previewLabel, setPreviewLabel] = useState("");
+  const [previewKeywords, setPreviewKeywords] = useState("");
+  const [previewing, setPreviewing] = useState(false);
+  const [previewResult, setPreviewResult] = useState<{
+    total: number;
+    matched: number;
+    avgDelta: number;
+  } | null>(null);
+
+  async function runPreview() {
+    const kws = previewKeywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+    if (previewLabel.trim().length < 2 || kws.length === 0) {
+      toast.error("Add a label and at least one keyword");
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const res = await api.post<{
+        preview: { total: number; matched: number; avgDelta: number };
+      }>("/api/rules/preview", {
+        label: previewLabel.trim(),
+        ruleType: "boost",
+        keywords: kws,
+        weight: 0.5,
+        active: true,
+      });
+      setPreviewResult(res.preview);
+    } catch (err) {
+      toast.error((err as Error).message || "Preview failed");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   // Open the dialog pre-filled from an AI suggestion ("Promote to rule").
   function promote(p: FeedbackPattern) {
     setRuleType("boost");
@@ -305,20 +343,44 @@ export default function RulesPage() {
           <Card className="border-slate-800 bg-slate-900/40">
             <CardHeader>
               <CardTitle className="text-base">Test a new rule</CardTitle>
+              <CardDescription>
+                See how a boost rule would affect your opportunities.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Input placeholder="Label…" className="h-8 border-slate-800 bg-slate-950" />
               <Input
-                placeholder="Keywords (comma)…"
+                placeholder="Label…"
+                value={previewLabel}
+                onChange={(e) => setPreviewLabel(e.target.value)}
                 className="h-8 border-slate-800 bg-slate-950"
               />
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => toast.info("Rule preview not wired yet")}
-              >
-                Preview impact
+              <Input
+                placeholder="Keywords (comma)…"
+                value={previewKeywords}
+                onChange={(e) => setPreviewKeywords(e.target.value)}
+                className="h-8 border-slate-800 bg-slate-950"
+              />
+              <Button size="sm" className="w-full" disabled={previewing} onClick={runPreview}>
+                {previewing ? "Calculating…" : "Preview impact"}
               </Button>
+              {previewResult && (
+                <div className="rounded-md border border-slate-800 bg-slate-950 p-2 text-xs text-slate-300">
+                  <div>
+                    Matches{" "}
+                    <span className="font-mono text-slate-100">{previewResult.matched}</span> of{" "}
+                    {previewResult.total} opportunities
+                  </div>
+                  <div>
+                    Avg score change:{" "}
+                    <span
+                      className={previewResult.avgDelta >= 0 ? "text-emerald-400" : "text-red-400"}
+                    >
+                      {previewResult.avgDelta >= 0 ? "+" : ""}
+                      {previewResult.avgDelta}
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

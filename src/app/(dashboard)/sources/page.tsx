@@ -8,6 +8,22 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
 import { SourceDetailDialog } from "@/components/sources/source-detail-dialog";
 import { useApi } from "@/lib/hooks/use-api";
@@ -15,6 +31,18 @@ import { api } from "@/lib/api-client/fetcher";
 import { timeAgo } from "@/lib/utils/format";
 import { SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import type { Source } from "@/lib/types";
+
+// Only platforms that have a real crawler module — creating a source for any
+// other platform would produce a no-op that never pulls data.
+const CRAWLER_PLATFORMS = [
+  { value: "reddit", label: "Reddit" },
+  { value: "hacker_news", label: "Hacker News" },
+  { value: "product_hunt", label: "Product Hunt" },
+  { value: "kaggle", label: "Kaggle" },
+  { value: "envato", label: "Envato" },
+  { value: "etsy", label: "Etsy" },
+  { value: "gumroad", label: "Gumroad" },
+] as const;
 
 export default function SourcesPage() {
   const [search, setSearch] = useState("");
@@ -24,6 +52,32 @@ export default function SourcesPage() {
   const { data, refetch } = useApi<{ sources: Source[] }>("/api/sources");
   const raw = data?.sources ?? [];
   const rows = raw.map((s) => ({ ...s, enabled: optimistic[s.id] ?? s.enabled }));
+
+  // Create-source dialog.
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [platform, setPlatform] = useState<string>("reddit");
+  const [label, setLabel] = useState("");
+
+  async function createSource() {
+    if (label.trim().length < 2) {
+      toast.error("Label needs at least 2 characters");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post("/api/sources", { sourcePlatform: platform, label: label.trim() });
+      toast.success(`Source "${label.trim()}" created`);
+      setLabel("");
+      setPlatform("reddit");
+      setOpen(false);
+      refetch();
+    } catch (err) {
+      toast.error((err as Error).message || "Create failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const filtered = rows.filter(
     (s) =>
@@ -62,7 +116,7 @@ export default function SourcesPage() {
         title="Sources"
         description={`${rows.length} integrations — toggle, retry, edit cron.`}
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => setOpen(true)}>
             <Plus className="mr-1 h-4 w-4" /> New source
           </Button>
         }
@@ -183,6 +237,58 @@ export default function SourcesPage() {
           onOpenChange={(o) => !o && setDetail(null)}
         />
       ) : null}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="border-slate-800 bg-slate-900 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New source</DialogTitle>
+            <DialogDescription>
+              Only platforms with an active crawler are listed. Most need an API key set in the
+              environment to return data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Platform</Label>
+              <Select value={platform} onValueChange={setPlatform}>
+                <SelectTrigger className="border-slate-800 bg-slate-950">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CRAWLER_PLATFORMS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Label</Label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder='e.g. "Reddit r/SaaS"'
+                className="border-slate-800 bg-slate-950"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLabel("");
+                setOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={createSource} disabled={saving}>
+              {saving ? "Creating…" : "Create source"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

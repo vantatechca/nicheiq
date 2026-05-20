@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { toast } from "sonner";
 import { downloadJson, downloadCsv } from "@/lib/utils/export";
-import { api } from "@/lib/api-client/fetcher";
 
 export default function SettingsPage() {
   const { data } = useSession();
@@ -21,12 +20,33 @@ export default function SettingsPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Helper: pull a paginated entity by hitting the API.
-  // Most listings return { entities: [...] } with a meta.totalCount or similar.
-  // We grab a large limit to get everything in one round-trip.
+  // Helper: pull ALL rows of an entity by paginating.
+  // The list APIs cap `limit` at 100 and return a `meta.nextCursor` for the
+  // next page. We loop until there's no cursor, so exports include the full
+  // dataset regardless of size (no silent truncation). Endpoints without
+  // pagination simply return everything on the first call (no cursor).
   async function fetchAll<T>(path: string, key: string): Promise<T[]> {
-    const res = (await api.get<Record<string, T[]>>(path)) as Record<string, T[]>;
-    return res?.[key] ?? [];
+    const all: T[] = [];
+    let cursor: string | null = null;
+    const sep = path.includes("?") ? "&" : "?";
+    for (let guard = 0; guard < 100; guard++) {
+      const qs: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const url: string = `${path}${sep}limit=100${qs}`;
+      const res: Response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}) as Record<string, unknown>);
+        throw new Error((body as { error?: string })?.error || `Request failed (${res.status})`);
+      }
+      const json = (await res.json()) as {
+        data?: Record<string, T[]>;
+        meta?: { nextCursor?: string | null };
+      };
+      const batch: T[] = json?.data?.[key] ?? [];
+      all.push(...batch);
+      cursor = json?.meta?.nextCursor ?? null;
+      if (!cursor || batch.length === 0) break;
+    }
+    return all;
   }
 
   async function exportEverythingJson() {
@@ -34,10 +54,10 @@ export default function SettingsPage() {
     try {
       const [opportunities, products, creators, signals, niches, resellable, goldenRules] =
         await Promise.all([
-          fetchAll("/api/opportunities?limit=500", "opportunities"),
-          fetchAll("/api/products?limit=500", "products"),
-          fetchAll("/api/creators?limit=500", "creators"),
-          fetchAll("/api/signals?limit=500", "signals"),
+          fetchAll("/api/opportunities", "opportunities"),
+          fetchAll("/api/products", "products"),
+          fetchAll("/api/creators", "creators"),
+          fetchAll("/api/signals", "signals"),
           fetchAll("/api/niches", "niches"),
           fetchAll("/api/resellable", "assets"),
           fetchAll("/api/rules", "rules"),
@@ -74,7 +94,7 @@ export default function SettingsPage() {
         projectedRevenueUsd: number;
         createdAt: string;
         updatedAt: string;
-      }>("/api/opportunities?limit=500", "opportunities");
+      }>("/api/opportunities", "opportunities");
       downloadCsv(
         `nicheiq-opportunities-${today}.csv`,
         opps.map((o) => ({
@@ -112,7 +132,7 @@ export default function SettingsPage() {
         ratingCount: number | null;
         estMonthlyRevenueLow: number | null;
         estMonthlyRevenueHigh: number | null;
-      }>("/api/products?limit=500", "products");
+      }>("/api/products", "products");
       downloadCsv(
         `nicheiq-products-${today}.csv`,
         products.map((p) => ({
@@ -148,7 +168,7 @@ export default function SettingsPage() {
         productCount: number;
         totalEstRevenueUsd: number;
         niches: string[];
-      }>("/api/creators?limit=500", "creators");
+      }>("/api/creators", "creators");
       downloadCsv(
         `nicheiq-creators-${today}.csv`,
         creators.map((c) => ({

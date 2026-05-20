@@ -94,6 +94,33 @@ export default function DigestPage() {
 }
 
 function DigestCard({ digest }: { digest: Digest }) {
+  const [resending, setResending] = useState(false);
+  async function handleResend() {
+    setResending(true);
+    try {
+      const res = await fetch("/api/digest", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Request failed");
+
+      const email = json?.data?.email ?? json?.email;
+      if (email?.sent) {
+        toast.success(`Digest emailed to ${(email.to ?? []).join(", ")}`);
+      } else if (email?.skipped === "no_api_key") {
+        toast.error("Digest rebuilt, but email not sent: RESEND_API_KEY isn't configured.");
+      } else if (email?.skipped === "no_recipients") {
+        toast.error("Digest rebuilt, but no recipients set (DIGEST_EMAIL_TO).");
+      } else if (email?.error) {
+        toast.error(`Digest rebuilt, but email failed: ${email.error}`);
+      } else {
+        toast.success("Digest rebuilt");
+      }
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      toast.error(`Failed to resend: ${(err as Error).message}`);
+    } finally {
+      setResending(false);
+    }
+  }
   return (
     <Card className="border-slate-800 bg-slate-900/40">
       <CardHeader>
@@ -157,8 +184,14 @@ function DigestCard({ digest }: { digest: Digest }) {
             <Mail className="mr-1 inline h-3 w-3" /> sent to {digest.sentTo.length}{" "}
             {digest.sentTo.length === 1 ? "recipient" : "recipients"}
           </span>
-          <Button variant="ghost" size="sm" className="h-6 text-xs">
-            Resend
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs"
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending ? "Sending…" : "Resend"}
           </Button>
         </div>
       </CardContent>
