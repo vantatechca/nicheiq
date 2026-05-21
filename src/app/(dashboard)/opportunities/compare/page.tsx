@@ -12,6 +12,8 @@ import { ScoreBar } from "@/components/shared/score-bar";
 import { useApi } from "@/lib/hooks/use-api";
 import { formatUsd, timeAgo } from "@/lib/utils/format";
 import { SCORE_DIMENSIONS } from "@/lib/utils/constants";
+import { normalizeBreakdown } from "@/lib/utils/score";
+
 
 interface ScoreDimension {
   value: number;
@@ -65,9 +67,12 @@ function CompareView() {
     ids[3] ? `/api/opportunities/${ids[3]}` : null,
   );
 
-  const slots = [slot1, slot2, slot3, slot4];
-  const loading = slots.some((s, i) => ids[i] && s.loading);
-  const opps = slots.map((s) => s.data?.opportunity).filter((o): o is Opportunity => !!o);
+const slots = [slot1, slot2, slot3, slot4];
+const loading = slots.some((s, i) => ids[i] && s.loading);
+const opps = slots
+  .map((s) => s.data?.opportunity)
+  .filter((o): o is Opportunity => !!o)
+  .map((o) => ({ ...o, scoreBreakdown: normalizeBreakdown(o.scoreBreakdown) }));
 
   if (loading && opps.length === 0) {
     return <div className="p-4 text-sm text-slate-500">Loading opportunities...</div>;
@@ -178,7 +183,7 @@ function CompareView() {
                   <tr key={dim.key} className="border-b border-slate-800/60">
                     <td className="py-2 text-xs text-slate-400">{dim.label}</td>
                     {opps.map((o) => {
-                      const v = o.scoreBreakdown.dimensions[dim.key]?.value ?? 0;
+                      const v = Math.round(o.scoreBreakdown.dimensions[dim.key]?.value ?? 0);
                       const won = winners[dim.key] === o.id;
                       return (
                         <td key={o.id} className="py-2">

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * Destination: src/components/shared/recharts-treemap.tsx  (REPLACES current)
+ *
+ * Fix: in recharts 2.x, the Treemap `content` renderer receives the node's data
+ * fields SPREAD DIRECTLY onto its props (name, value, color, href, meta, plus the
+ * computed x/y/width/height) — there is NO `payload` prop. The old CellRenderer
+ * read `props.payload`, which was always undefined, so every cell returned null
+ * and the treemap rendered blank. We now read the fields straight off props.
+ */
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 
 interface Cell {
@@ -34,9 +43,11 @@ export function RechartsTreemap({ data, height = 360, onClick }: Props) {
             fontSize: 12,
             borderRadius: 8,
           }}
-          formatter={(_v, _n, payload) => {
-            const p = payload as unknown as { payload: Cell };
-            return [`${p.payload.value}`, p.payload.meta ?? p.payload.name];
+          formatter={(_v, _n, entry) => {
+            // Tooltip DOES wrap the node in `.payload`; the renderer below does not.
+            const p = entry as unknown as { payload?: Cell };
+            const cell = p.payload;
+            return [`${cell?.value ?? ""}`, cell?.meta ?? cell?.name ?? ""];
           }}
         />
       </Treemap>
@@ -44,6 +55,7 @@ export function RechartsTreemap({ data, height = 360, onClick }: Props) {
   );
 }
 
+// recharts spreads the node data + layout onto these props directly.
 interface CellProps {
   x?: number;
   y?: number;
@@ -52,18 +64,37 @@ interface CellProps {
   name?: string;
   value?: number;
   color?: string;
-  payload?: Cell;
+  href?: string;
+  meta?: string;
+  depth?: number;
   onCellClick?: (cell: Cell) => void;
 }
 
 function CellRenderer(props: CellProps) {
-  const { x = 0, y = 0, width = 0, height = 0, payload, onCellClick } = props;
-  const cell = payload;
-  if (!cell) return null;
+  const {
+    x = 0,
+    y = 0,
+    width = 0,
+    height = 0,
+    name = "",
+    value = 0,
+    color,
+    href,
+    meta,
+    depth,
+    onCellClick,
+  } = props;
+
+  // Treemap emits a root wrapper node (depth 0) covering the whole area; skip it
+  // so it doesn't paint over the real cells. Also skip zero-area cells.
+  if (depth === 0 || width <= 0 || height <= 0) return null;
+
+  const cell: Cell = { name, value, color: color ?? "rgba(148,163,184,0.4)", href, meta };
   const tooSmall = width < 60 || height < 30;
+
   return (
     <g
-      style={{ cursor: cell.href || onCellClick ? "pointer" : "default" }}
+      style={{ cursor: href || onCellClick ? "pointer" : "default" }}
       onClick={() => onCellClick?.(cell)}
     >
       <rect
@@ -76,15 +107,22 @@ function CellRenderer(props: CellProps) {
         strokeWidth={1}
       />
       {!tooSmall ? (
-        <>
-          <text x={x + 8} y={y + 18} fill="rgba(255,255,255,0.9)" fontSize={11} fontWeight={600}>
-            {cell.name}
-          </text>
-          <text x={x + 8} y={y + 32} fill="rgba(255,255,255,0.6)" fontSize={10}>
-            {cell.meta}
-          </text>
-        </>
+  <>
+    <clipPath id={`clip-${x}-${y}`}>
+      <rect x={x} y={y} width={width} height={height} />
+    </clipPath>
+    <g clipPath={`url(#clip-${x}-${y})`}>
+      <text x={x + 8} y={y + 18} fill="rgba(255,255,255,0.92)" fontSize={11} fontWeight={600}>
+        {cell.name}
+      </text>
+      {height > 44 ? (
+        <text x={x + 8} y={y + 32} fill="rgba(255,255,255,0.6)" fontSize={10}>
+          {cell.meta}
+        </text>
       ) : null}
+    </g>
+  </>
+) : null}
     </g>
   );
 }

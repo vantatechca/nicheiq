@@ -1,24 +1,32 @@
 "use client";
 
-import { useParams } from "next/navigation";
+// Product detail. For MARKET products (crawled) it shows the catalog stats +
+// the external creator's playbook. For MINE products (launched from an
+// opportunity → opportunityId set), market stats are genuinely empty (no sales
+// yet), so instead of a bare, boring page we surface the REAL launch story:
+// the linked opportunity's score, projected revenue, build effort, status, and
+// summary. No faked sales/ratings — that would undercut the data's credibility.
+
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Star, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, Star, Sparkles, Rocket, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
+import { ScoreBadge } from "@/components/shared/score-badge";
 import { useApi } from "@/lib/hooks/use-api";
 import { api } from "@/lib/api-client/fetcher";
 import { formatUsd, formatNumber, formatRange, timeAgo } from "@/lib/utils/format";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 interface Product {
   id: string;
   title: string;
   creator: string | null;
   creatorId: string | null;
+  opportunityId: string | null;
   sourcePlatform: string;
   sourceUrl: string;
   thumbnailUrl: string | null;
@@ -45,19 +53,56 @@ interface Creator {
   niches: string[];
 }
 
+interface Opportunity {
+  id: string;
+  title: string;
+  summary: string;
+  status: string;
+  score: number;
+  opportunityType: string;
+  buildEffort: string;
+  projectedRevenueUsd: number;
+}
+
+// Deterministic gradient from the niche string, so a thumbnail-less (launched)
+// product gets an intentional-looking cover instead of a black box.
+function nicheGradient(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+  const h2 = (h + 40) % 360;
+  return `linear-gradient(135deg, hsl(${h} 45% 22%), hsl(${h2} 55% 32%))`;
+}
+
 export default function ProductDetailPage() {
   const router = useRouter();
   const [promoting, setPromoting] = useState(false);
+  const { id } = useParams<{ id: string }>();
+
+  const { data: productData, loading } = useApi<{ product: Product }>(
+    id ? `/api/products/${id}` : null,
+  );
+  const product = productData?.product ?? null;
+
+  const { data: creatorData } = useApi<{ creator: Creator }>(
+    product?.creatorId ? `/api/creators/${product.creatorId}` : null,
+  );
+  const creator = creatorData?.creator ?? null;
+
+  // Linked opportunity — only for launched ("Mine") products.
+  const { data: oppData } = useApi<{ opportunity: Opportunity }>(
+    product?.opportunityId ? `/api/opportunities/${product.opportunityId}` : null,
+  );
+  const opportunity = oppData?.opportunity ?? null;
+
+  const { data: similarData } = useApi<{ products: Product[] }>(
+    product ? `/api/products?niche=${product.niche}&limit=10` : null,
+  );
+  const similar = (similarData?.products ?? []).filter((p) => p.id !== product?.id).slice(0, 6);
 
   const handlePromote = async () => {
     if (!product || promoting) return;
     setPromoting(true);
     try {
-      // Uses the dedicated endpoint instead of POST /api/opportunities so
-      // the resulting opportunity carries sourceProductIds: [product.id],
-      // a baseline 5-dimension score breakdown, and the proper "Replicate:"
-      // title format. The generic create endpoint dropped all of that on
-      // the floor.
       const res = await api.post<{ opportunity: { id: string; title: string } }>(
         `/api/products/${product.id}/promote-to-opportunity`,
       );
@@ -71,28 +116,10 @@ export default function ProductDetailPage() {
     }
   };
 
-  const { id } = useParams<{ id: string }>();
-
-  // Main product fetch.
-  const { data: productData, loading } = useApi<{ product: Product }>(
-    id ? `/api/products/${id}` : null,
-  );
-  const product = productData?.product ?? null;
-
-  // Creator lookup — only if product has a creatorId. Lookup by id.
-  const { data: creatorData } = useApi<{ creator: Creator }>(
-    product?.creatorId ? `/api/creators/${product.creatorId}` : null,
-  );
-  const creator = creatorData?.creator ?? null;
-
-  // Similar products — same niche.
-  const { data: similarData } = useApi<{ products: Product[] }>(
-    product ? `/api/products?niche=${product.niche}&limit=10` : null,
-  );
-  const similar = (similarData?.products ?? []).filter((p) => p.id !== product?.id).slice(0, 6);
-
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading product…</div>;
   if (!product) return <div className="p-6 text-sm text-slate-400">Product not found.</div>;
+
+  const isMine = !!product.opportunityId;
 
   return (
     <>
@@ -104,33 +131,62 @@ export default function ProductDetailPage() {
 
       <PageHeader
         title={product.title}
-        description={`${product.creator ?? "Unknown"} · ${product.sourcePlatform.replace(/_/g, " ")}`}
+        description={
+          isMine
+            ? `Launched from opportunity · ${product.niche.replace(/_/g, " ")}`
+            : `${product.creator ?? "Unknown"} · ${product.sourcePlatform.replace(/_/g, " ")}`
+        }
         actions={
-          <>
-            <Button variant="outline" size="sm" asChild>
-              <a href={product.sourceUrl} target="_blank" rel="noreferrer">
-                Source <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </Button>
-            <Button size="sm" onClick={handlePromote} disabled={promoting}>
-              <Sparkles className="mr-1 h-4 w-4" />
-              {promoting ? "Promoting…" : "Promote to opportunity"}
-            </Button>
-          </>
+          isMine ? (
+            opportunity ? (
+              <Button size="sm" asChild>
+                <Link href={`/opportunities/${opportunity.id}`}>
+                  <ArrowUpRight className="mr-1 h-4 w-4" /> Open opportunity
+                </Link>
+              </Button>
+            ) : null
+          ) : (
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <a href={product.sourceUrl} target="_blank" rel="noreferrer">
+                  Source <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+              </Button>
+              <Button size="sm" onClick={handlePromote} disabled={promoting}>
+                <Sparkles className="mr-1 h-4 w-4" />
+                {promoting ? "Promoting…" : "Promote to opportunity"}
+              </Button>
+            </>
+          )
         }
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card className="overflow-hidden border-slate-800 bg-slate-900/40">
-            <div className="relative aspect-[16/9] bg-slate-800">
+            <div
+              className="relative flex aspect-[16/9] items-end bg-slate-800"
+              style={!product.thumbnailUrl ? { background: nicheGradient(product.niche) } : undefined}
+            >
               {product.thumbnailUrl ? (
                 <img
                   src={product.thumbnailUrl}
                   alt={product.title}
                   className="h-full w-full object-cover"
                 />
-              ) : null}
+              ) : (
+                <div className="p-5">
+                  {isMine ? (
+                    <Badge className="mb-2 bg-emerald-500/20 text-emerald-300">
+                      <Rocket className="mr-1 h-3 w-3" /> Launched product
+                    </Badge>
+                  ) : null}
+                  <div className="text-lg font-semibold text-white/90">{product.title}</div>
+                  <div className="text-xs uppercase tracking-wide text-white/50">
+                    {product.niche.replace(/_/g, " ")}
+                  </div>
+                </div>
+              )}
             </div>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
@@ -147,26 +203,34 @@ export default function ProductDetailPage() {
                   value={
                     product.ratingAvg != null
                       ? `${product.ratingAvg.toFixed(1)} (${formatNumber(product.ratingCount ?? 0, { compact: true })})`
-                      : "—"
+                      : isMine
+                        ? "New — no reviews yet"
+                        : "—"
                   }
                 />
                 <Stat label="Niche" value={product.niche.replace(/_/g, " ")} />
                 <Stat
-                  label="Est. monthly sales"
+                  label={isMine ? "Sales (since launch)" : "Est. monthly sales"}
                   value={
                     product.estMonthlySalesLow != null && product.estMonthlySalesHigh != null
                       ? `${formatNumber(product.estMonthlySalesLow)}–${formatNumber(product.estMonthlySalesHigh)}`
-                      : "—"
+                      : isMine
+                        ? "Tracking…"
+                        : "—"
                   }
                 />
                 <Stat
-                  label="Est. monthly revenue"
-                  value={formatRange(
-                    product.estMonthlyRevenueLow ?? 0,
-                    product.estMonthlyRevenueHigh ?? 0,
-                  )}
+                  label={isMine ? "Projected revenue" : "Est. monthly revenue"}
+                  value={
+                    isMine && opportunity
+                      ? `${formatUsd(opportunity.projectedRevenueUsd, { compact: true })}/mo target`
+                      : formatRange(
+                          product.estMonthlyRevenueLow ?? 0,
+                          product.estMonthlyRevenueHigh ?? 0,
+                        )
+                  }
                 />
-                <Stat label="First seen" value={timeAgo(product.createdAt)} />
+                <Stat label={isMine ? "Launched" : "First seen"} value={timeAgo(product.createdAt)} />
               </div>
             </CardContent>
           </Card>
@@ -207,6 +271,38 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {/* MINE: show the linked opportunity — the real story behind a launch. */}
+          {opportunity ? (
+            <Card className="border-slate-800 bg-slate-900/40">
+              <CardHeader>
+                <CardTitle>Opportunity</CardTitle>
+                <CardDescription>Why this was launched.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <ScoreBadge score={opportunity.score} size="lg" />
+                  <Badge variant="outline" className="text-[10px] capitalize">
+                    {opportunity.status}
+                  </Badge>
+                </div>
+                <p className="line-clamp-4 text-xs text-slate-400">{opportunity.summary}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <Stat
+                    label="Projected"
+                    value={`${formatUsd(opportunity.projectedRevenueUsd, { compact: true })}/mo`}
+                  />
+                  <Stat label="Build effort" value={opportunity.buildEffort.replace(/_/g, " ")} />
+                  <Stat label="Type" value={opportunity.opportunityType.replace(/_/g, " ")} />
+                  <Stat label="Niche" value={product.niche.replace(/_/g, " ")} />
+                </div>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href={`/opportunities/${opportunity.id}`}>Open full opportunity →</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* MARKET: show the external creator's playbook. */}
           {creator ? (
             <Card className="border-slate-800 bg-slate-900/40">
               <CardHeader>
@@ -244,6 +340,15 @@ export default function ProductDetailPage() {
                 <Button asChild variant="outline" size="sm" className="mt-3 w-full">
                   <Link href={`/creators/${creator.id}`}>Open playbook →</Link>
                 </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Neither linked yet — keep the column from being empty. */}
+          {!opportunity && !creator ? (
+            <Card className="border-dashed border-slate-800 bg-slate-900/20">
+              <CardContent className="p-4 text-xs text-slate-500">
+                No linked creator or opportunity for this product yet.
               </CardContent>
             </Card>
           ) : null}

@@ -1,9 +1,9 @@
 "use client";
 
-// Client view for /niches. Only interactive concern is the view-mode toggle
-// (grid vs treemap). I'm putting it in the URL so a user's chosen view sticks
-// across navigation — load /niches and see whatever you last picked. The
-// treemap also needs `useRouter` for click-through navigation.
+// Client view for /niches. Fetches the niche list live from /api/niches (which
+// computes per-niche aggregates: opportunityCount, productCount, momentumScore).
+// The only interactive concern is the view-mode toggle (grid vs treemap), kept
+// in the URL so a user's chosen view sticks across navigation.
 
 import { useTransition } from "react";
 import Link from "next/link";
@@ -15,7 +15,19 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { RechartsTreemap } from "@/components/shared/recharts-treemap";
 import { formatNumber } from "@/lib/utils/format";
-import type { Niche } from "@/lib/types";
+import { useApi } from "@/lib/hooks/use-api";
+
+// Local type: the enriched shape /api/niches returns. (The `Niche` type in
+// @/lib/types mirrors the DB table, which has no aggregate columns.)
+interface Niche {
+  id: string;
+  slug: string;
+  label: string;
+  description: string;
+  momentumScore: number;
+  opportunityCount: number;
+  productCount: number;
+}
 
 function colorForMomentum(score: number) {
   if (score >= 80) return "rgba(16,185,129,0.6)";
@@ -26,14 +38,16 @@ function colorForMomentum(score: number) {
 }
 
 interface Props {
-  niches: Niche[];
   initialView: "grid" | "treemap";
 }
 
-export function NichesView({ niches, initialView }: Props) {
+export function NichesView({ initialView }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [, startTransition] = useTransition();
+
+  const { data, loading } = useApi<{ niches: Niche[] }>("/api/niches");
+  const niches = [...(data?.niches ?? [])].sort((a, b) => b.momentumScore - a.momentumScore);
 
   function setView(v: "grid" | "treemap") {
     startTransition(() => {
@@ -48,6 +62,10 @@ export function NichesView({ niches, initialView }: Props) {
     href: `/niches/${n.slug}`,
     meta: `momentum ${n.momentumScore} · ${n.opportunityCount} opps · ${n.productCount} products`,
   }));
+
+  if (loading && niches.length === 0) {
+    return <div className="p-4 text-sm text-slate-500">Loading niches…</div>;
+  }
 
   return (
     <>

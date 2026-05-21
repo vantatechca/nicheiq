@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+// Annotations thread for an opportunity. Fetches the real thread from
+// GET /api/opportunities/:id/annotations on mount, and POSTs new notes.
+// (Previously it never fetched, and fell back to a hardcoded mock seed note
+//  when no `initial` prop was passed — so live mode showed a fake note and
+//  never loaded saved ones.)
+
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, timeAgo } from "@/lib/utils/format";
-import { mockUsers } from "@/mock/data";
 
 interface Annotation {
   id: string;
@@ -18,26 +23,59 @@ interface Annotation {
   createdAt: string;
 }
 
-interface Props {
-  opportunityId: string;
-  initial?: Annotation[];
+// Raw row shape from the API (the DB stores userId + body + createdAt).
+interface ApiAnnotation {
+  id: string;
+  userId: string;
+  body: string;
+  createdAt: string;
 }
 
-export function AnnotationsThread({ opportunityId, initial }: Props) {
-  const { data } = useSession();
-  const [items, setItems] = useState<Annotation[]>(
-    initial ?? [
-      {
-        id: "ann_seed_1",
-        userName: mockUsers[0]!.name,
-        userInitials: initials(mockUsers[0]!.name),
-        body: "Want to validate via TikTok demo first. Add a 60-second screen recording link before committing.",
-        createdAt: new Date(Date.now() - 6 * 3_600_000).toISOString(),
-      },
-    ],
-  );
+interface Props {
+  opportunityId: string;
+}
+
+function toView(a: ApiAnnotation): Annotation {
+  // userId is an email or id; show whatever is most human, derive initials from it.
+  const name = a.userId.includes("@") ? a.userId.split("@")[0]! : a.userId;
+  return {
+    id: a.id,
+    userName: name,
+    userInitials: initials(name),
+    body: a.body,
+    createdAt: a.createdAt,
+  };
+}
+
+export function AnnotationsThread({ opportunityId }: Props) {
+  const { data: session } = useSession();
+  const [items, setItems] = useState<Annotation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
+
+  // Load the real thread on mount.
+  useEffect(() => {
+    const ac = new AbortController();
+    setLoading(true);
+    fetch(`/api/opportunities/${opportunityId}/annotations`, { signal: ac.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<{ data: { annotations: ApiAnnotation[] } }>;
+      })
+      .then((json) => {
+        if (!ac.signal.aborted) setItems(json.data.annotations.map(toView));
+      })
+      .catch((err) => {
+        if (!ac.signal.aborted && err.name !== "AbortError") {
+          toast.error(`Couldn't load notes: ${(err as Error).message}`);
+        }
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLoading(false);
+      });
+    return () => ac.abort();
+  }, [opportunityId]);
 
   async function submit() {
     const trimmed = body.trim();
@@ -60,7 +98,7 @@ export function AnnotationsThread({ opportunityId, initial }: Props) {
       const json = (await res.json()) as {
         data: { annotation: { id: string; createdAt: string } };
       };
-      const userName = data?.user?.name ?? "You";
+      const userName = session?.user?.name ?? session?.user?.email ?? "You";
       setItems((prev) => [
         {
           id: json.data.annotation.id,
@@ -107,7 +145,11 @@ export function AnnotationsThread({ opportunityId, initial }: Props) {
         </div>
       </div>
       <div className="space-y-2">
-        {items.length === 0 ? (
+        {loading ? (
+          <div className="rounded-md border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
+            Loading notes…
+          </div>
+        ) : items.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
             No notes yet. First one above ↑
           </div>

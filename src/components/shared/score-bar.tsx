@@ -16,7 +16,7 @@ export function ScoreBar({ breakdown }: Props) {
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="text-slate-300">{label}</span>
               <span className="font-mono text-slate-400">
-                {dim.value} <span className="opacity-50">· w {weight}</span>
+                {Math.round(dim.value)} <span className="opacity-50">· w {weight}</span>
               </span>
             </div>
             <Progress value={dim.value} className="h-1.5 bg-slate-800" />
