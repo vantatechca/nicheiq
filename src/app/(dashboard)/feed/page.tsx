@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bookmark, Package, Pause, Play, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
+import { Bookmark, Pause, Play, Sparkles, ThumbsDown, ThumbsUp, Zap } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,15 +17,11 @@ import { toast } from "sonner";
 import type { Signal } from "@/lib/types";
 
 export default function FeedPage() {
-  const router = useRouter();
   const [niche, setNiche] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [paused, setPaused] = useState(false);
-  // Per-signal pending state so the button can disable + spin without
-  // affecting other rows. We keep a Set of ids currently in flight.
-  const [promoting, setPromoting] = useState<Set<string>>(new Set());
   // Tracks which signals the current session already saved, so the
   // Bookmark icon can flip to "filled" without a re-fetch. This is
   // session-local; on reload we'd need a /api/signals?saved=1 to
@@ -56,38 +51,6 @@ export default function FeedPage() {
       }
     } catch (err) {
       toast.error("Couldn't react: " + (err as Error).message);
-    }
-  }
-
-  async function promoteToProduct(signalId: string) {
-    if (promoting.has(signalId)) return;
-    setPromoting((prev) => new Set(prev).add(signalId));
-    try {
-      const res = await api.post<{
-        product: { id: string; title: string } | null;
-        alreadyExisted: boolean;
-      }>(`/api/signals/${signalId}/promote-to-product`);
-      if (res?.product) {
-        const verb = res.alreadyExisted ? "Already tracked" : "Tracked as product";
-        // Use a richer toast: clickable to jump straight to the product page.
-        toast.success(verb, {
-          description: res.product.title,
-          action: {
-            label: "Open",
-            onClick: () => router.push(`/products/${res.product!.id}`),
-          },
-        });
-      } else {
-        toast.error("Promote failed — empty response");
-      }
-    } catch (err) {
-      toast.error("Couldn't promote: " + (err as Error).message);
-    } finally {
-      setPromoting((prev) => {
-        const next = new Set(prev);
-        next.delete(signalId);
-        return next;
-      });
     }
   }
 
@@ -265,17 +228,6 @@ export default function FeedPage() {
                   title={savedIds.has(s.id) ? "Saved" : "Save for later"}
                 >
                   <Bookmark className={`h-3 w-3 ${savedIds.has(s.id) ? "fill-current" : ""}`} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 hover:text-emerald-300"
-                  disabled={promoting.has(s.id)}
-                  onClick={() => promoteToProduct(s.id)}
-                  aria-label="Promote to product"
-                  title="Track as product"
-                >
-                  <Package className={`h-3 w-3 ${promoting.has(s.id) ? "animate-pulse" : ""}`} />
                 </Button>
                 <Button asChild variant="ghost" size="icon" className="h-7 w-7">
                   <Link href={`/brain?mode=global&signal=${s.id}`}>

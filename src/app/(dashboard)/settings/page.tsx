@@ -94,6 +94,7 @@ export default function SettingsPage() {
         projectedRevenueUsd: number;
         createdAt: string;
         updatedAt: string;
+        summary: string;
       }>("/api/opportunities", "opportunities");
       downloadCsv(
         `nicheiq-opportunities-${today}.csv`,
@@ -108,6 +109,7 @@ export default function SettingsPage() {
           projectedRevenueUsd: o.projectedRevenueUsd,
           createdAt: o.createdAt,
           updatedAt: o.updatedAt,
+          summary: o.summary,
         })),
       );
       toast.success("Opportunities CSV downloaded");

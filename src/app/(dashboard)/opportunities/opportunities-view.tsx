@@ -67,7 +67,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
       if (next.status) u.set("status", next.status);
       if (next.minScore > 0) u.set("minScore", String(next.minScore));
       if (next.search.trim()) u.set("q", next.search.trim());
-      if (next.sort !== "score") u.set("sort", next.sort);
+      if (next.sort !== "newest") u.set("sort", next.sort);
       const qs = u.toString();
       startTransition(() => {
         router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -103,12 +103,23 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     });
   }
 
-  async function bulkAction(label: string) {
+  async function bulkAction(label: string, status: string) {
     if (selected.size === 0) return;
-    toast.success(
-      `${label} ${selected.size} opportunit${selected.size === 1 ? "y" : "ies"} (mock)`,
-    );
-    setSelected(new Set());
+    const ids = Array.from(selected);
+    try {
+      const res = await fetch("/api/opportunities/bulk-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, status }),
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const { updated } = await res.json();
+      toast.success(`${label} ${updated} opportunit${updated === 1 ? "y" : "ies"}`);
+      setSelected(new Set());
+      startTransition(() => router.refresh());
+    } catch (err) {
+      toast.error(`Couldn't update: ${(err as Error).message}`);
+    }
   }
 
   const [synthesizing, setSynthesizing] = useState(false);
@@ -264,16 +275,16 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
               </Link>
             </Button>
           ) : null}
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted")}>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted", "shortlisted")}>
             Shortlist
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Marked building")}>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Marked building", "building")}>
             Mark building
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Abandoned")}>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Abandoned", "abandoned")}>
             Abandon
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Archived")}>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("Archived", "archived")}>
             Archive
           </Button>
           <Button

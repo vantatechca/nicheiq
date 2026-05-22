@@ -28,7 +28,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const status = sp.status ?? null;
   const minScore = Number(sp.minScore ?? 0);
   const search = sp.q ?? "";
-  const sort = (sp.sort as "score" | "newest" | "revenue") ?? "score";
+  const sort = (sp.sort as "score" | "newest" | "revenue") ?? "newest";
 
   const db = getDb();
 
