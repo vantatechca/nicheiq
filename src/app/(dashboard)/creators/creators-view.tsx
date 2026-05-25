@@ -8,7 +8,9 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
 import { SOURCE_PLATFORMS } from "@/lib/utils/constants";
@@ -58,6 +60,13 @@ export function CreatorsView({ creators, total, filters }: Props) {
       <PageHeader
         title="Creators"
         description={`${creators.length} of ${total} creators by est. monthly revenue.`}
+        actions={
+          <Button asChild size="sm" variant="outline">
+            <a href="/api/export/creators-workbook" download>
+              <FileSpreadsheet className="mr-1 h-4 w-4" /> Export workbook
+            </a>
+          </Button>
+        }
       />
 
       <Card className="mb-4 border-slate-800 bg-slate-900/40">

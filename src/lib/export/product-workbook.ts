@@ -50,7 +50,7 @@ const PRODUCT_HEADERS = [
   "Niche",
   "Platform",
   "Est. Sales / mo",
-  "Est. Revenue / mo ($)",
+  "Est. Revenue ($)",
   "Revenue Basis",
   "Last Seen",
   "First Seen",
@@ -69,7 +69,7 @@ function addProductSheet(
 
   ws.mergeCells("A1:I1");
   const title = ws.getCell("A1");
-  title.value = "NicheIQ — Proven Product Winners";
+  title.value = "NicheIQ — Digital Product Winners";
   title.font = { bold: true, size: 16, color: { argb: TITLE_ARGB } };
   ws.getRow(1).height = 24;
 
@@ -168,7 +168,7 @@ function addNicheSheet(wb: ExcelJS.Workbook, data: NicheRow[]) {
 
   ws.mergeCells("A1:D1");
   const title = ws.getCell("A1");
-  title.value = "Winners by niche (live data)";
+  title.value = "Demand by niche (live data)";
   title.font = { bold: true, size: 14, color: { argb: TITLE_ARGB } };
 
   const headers = ["Niche", "# Products", "Avg Revenue ($)", "Total Est. Revenue ($)"];
@@ -246,14 +246,14 @@ export async function buildProductWorkbook(allRows: ProductRow[]): Promise<Array
   addProductSheet(
     wb,
     "Top Candidates",
-    `Top ${topRows.length} highest-revenue products (≥ $${CANDIDATE_FLOOR.toLocaleString()}/mo est.), of ${allRows.length} live products. Sorted by est. revenue.`,
+    `Top ${topRows.length} REAL winners (top revenue, seed/demo excluded), of ${allRows.length} live products. Sorted by est. revenue.`,
     topRows,
     true,
   );
   addProductSheet(
     wb,
     "All Products",
-    `All ${allRows.length} live products, ranked by last seen (freshest first). Seed/demo excluded.`,
+    `All ${allRows.length} live products (seed/demo excluded), ranked by last seen.`,
     byLastSeen,
     false,
   );
