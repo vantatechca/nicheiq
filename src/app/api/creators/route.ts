@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db/client";
 import { creators } from "@/lib/db/schema";
 import { ok, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
+import { excludeSeedsClause, shouldIncludeSeeds } from "@/lib/db/seed-filter";
 
 export async function GET(req: NextRequest) {
   const session = await requireSession();
@@ -17,6 +18,11 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const conditions: SQL[] = [];
+
+  // Hide seeded mock creators by default (same behavior as /products and
+  // /opportunities, and matching the creators-workbook export). Opt out with
+  // ?includeSeeds=1.
+  conditions.push(...excludeSeedsClause(creators.id, shouldIncludeSeeds(req.nextUrl)));
 
   if (platform)
     conditions.push(
