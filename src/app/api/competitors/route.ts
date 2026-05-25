@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
-import { desc } from "drizzle-orm";
+import { and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { competitors } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
+import { excludeSeedsClause, shouldIncludeSeeds } from "@/lib/db/seed-filter";
 
 const competitorSchema = z.object({
   creatorId: z.string(),
@@ -12,12 +13,19 @@ const competitorSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
 
   const db = getDb();
-  const rows = await db.select().from(competitors).orderBy(desc(competitors.lastReviewedAt));
+  // Seed competitors point to seed creators (creator_N), so filter on the
+  // creator reference — keeps page + export consistent (both real-only).
+  const conditions = excludeSeedsClause(competitors.creatorId, shouldIncludeSeeds(req.nextUrl));
+  const rows = await db
+    .select()
+    .from(competitors)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(competitors.lastReviewedAt));
   return ok({ competitors: rows });
 }
 
