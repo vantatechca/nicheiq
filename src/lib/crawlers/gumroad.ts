@@ -1,4 +1,5 @@
 import type { CrawlerModule, RawSignal } from "./types";
+import { estimateFromProxy, PROXY_CONVERSION, revenueBasisTag } from "./revenue";
 
 const DIGITAL_QUERIES = [
   "notion template",
@@ -100,6 +101,15 @@ const gumroad: CrawlerModule = {
       const priceUsd = p.price / 100;
       if (priceUsd > 500) continue;
 
+      // Gumroad exposes no sales count, but rating_count is a lower bound on
+      // real sales (only buyers rate) — a stronger proxy than favourites.
+      const est = estimateFromProxy({
+        proxyCount: p.rating_count ?? 0,
+        priceUsd,
+        basis: "ratings-proxy",
+        conversion: PROXY_CONVERSION.ratings,
+      });
+
       signals.push({
         sourcePlatform: "gumroad",
         sourceId: p.id,
@@ -107,8 +117,12 @@ const gumroad: CrawlerModule = {
         title: p.name,
         snippet: p.description?.slice(0, 280) || undefined,
         priceUsd,
+        ratingAvg: p.rating_average ?? undefined,
+        ratingCount: p.rating_count ?? undefined,
+        estMonthlySales: est.sales,
+        estMonthlyRevenue: est.revenue,
         capturedAt: new Date().toISOString(),
-        tags: (p.tags ?? []).concat(p._query).slice(0, 12),
+        tags: [...(p.tags ?? []).concat(p._query).slice(0, 11), revenueBasisTag(est.basis)],
         thumbnailUrl: p.preview_url ?? undefined,
         creator: {
           handle: p.seller_name,

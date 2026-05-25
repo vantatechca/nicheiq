@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
-import { and, desc, eq, gte, lte, ilike, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ilike, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { opportunities } from "@/lib/db/schema";
 import { badRequest, unauthorized } from "@/lib/api/response";
 import { searchQuerySchema } from "@/lib/utils/validation";
 import { requireSession } from "@/lib/auth/session";
+import { excludeSeedsClause, shouldIncludeSeeds } from "@/lib/db/seed-filter";
+import { cloneDifficulty } from "@/lib/utils/niche-difficulty";
 
 /**
  * GET /api/opportunities/export
@@ -19,24 +21,26 @@ import { requireSession } from "@/lib/auth/session";
  */
 const MAX_ROWS = 10_000;
 
-// Columns chosen for a database import: scalar fields only. The embedding
-// vector, JSON build-plan, and score-breakdown blobs are intentionally omitted
-// — they don't belong in a flat CSV. Array fields are joined with "|".
+// Column layout matches the team's working export format: scannable scalar
+// fields up front, the long `summary` last. Internal blobs (embedding vector,
+// build-plan JSON, score breakdown) and noise columns (aiRationale,
+// sourceSignalIds, createdBy) are intentionally omitted. `type` is the
+// opportunityType field under its shorter, familiar header. `cloneDifficulty`
+// is kept (the "which niches are easier to reproduce" axis) right after niche.
+// Array fields are joined with "|".
 const COLUMNS = [
   "id",
   "title",
-  "summary",
   "niche",
-  "opportunityType",
+  "cloneDifficulty",
+  "type",
   "buildEffort",
-  "projectedRevenueUsd",
-  "score",
   "status",
-  "aiRationale",
-  "sourceSignalIds",
-  "createdBy",
+  "score",
+  "projectedRevenueUsd",
   "createdAt",
   "updatedAt",
+  "summary",
 ] as const;
 
 /** RFC-4180 CSV cell: wrap in quotes if it contains comma, quote, or newline. */
@@ -62,6 +66,9 @@ export async function GET(req: NextRequest) {
 
   // Same WHERE construction as the list endpoint (minus cursor pagination).
   const conditions: SQL[] = [];
+  // Hide the seeded mock opportunities by default so the export is real data
+  // only (override with ?includeSeeds=1). Matches /api/products behavior.
+  conditions.push(...excludeSeedsClause(opportunities.id, shouldIncludeSeeds(req.nextUrl)));
   if (q.niche)
     conditions.push(
       eq(opportunities.niche, q.niche as (typeof opportunities.niche.enumValues)[number]),
@@ -96,6 +103,9 @@ export async function GET(req: NextRequest) {
     if (q.sort === "newest") return [desc(opportunities.createdAt), desc(opportunities.id)];
     if (q.sort === "revenue")
       return [desc(opportunities.projectedRevenueUsd), desc(opportunities.id)];
+    // "niche" → group by niche (A→Z), best-scoring first within each niche.
+    if (q.sort === "niche")
+      return [asc(opportunities.niche), desc(opportunities.score), desc(opportunities.id)];
     return [desc(opportunities.score), desc(opportunities.id)];
   })();
 
@@ -106,8 +116,16 @@ export async function GET(req: NextRequest) {
     .orderBy(...orderBy)
     .limit(MAX_ROWS);
 
+  // Derived/aliased columns: cloneDifficulty from the niche, and `type` as the
+  // shorter header for opportunityType (matching the team's export format).
+  const enriched = rows.map((row) => ({
+    ...row,
+    cloneDifficulty: cloneDifficulty(row.niche),
+    type: row.opportunityType,
+  }));
+
   const header = COLUMNS.join(",");
-  const body = rows
+  const body = enriched
     .map((row) => COLUMNS.map((col) => csvCell((row as Record<string, unknown>)[col])).join(","))
     .join("\r\n");
   const csv = `${header}\r\n${body}`;

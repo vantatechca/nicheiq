@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { FilterChips } from "@/components/shared/filter-chips";
 import { NICHE_LIST, SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import { formatUsd, formatNumber, formatRange } from "@/lib/utils/format";
-import { FileDown, Rocket, Star, Users } from "lucide-react";
+import { FileDown, FileSpreadsheet, Rocket, Star, Trophy, Users } from "lucide-react";
 import type { Product } from "@/lib/types";
 
 type ViewMode = "mine" | "market" | "all";
@@ -71,6 +71,33 @@ export function ProductsView({ products, total, counts, filters }: Props) {
     return () => clearTimeout(t);
   }, [searchInput, filters.search, updateFilter]);
 
+  // Export URLs point at GET /api/export/products. We use a plain <a download>
+  // rather than fetch+blob: the route is same-origin, the NextAuth session
+  // cookie rides along automatically, and its Content-Disposition header makes
+  // the browser download the CSV without navigating away.
+  function exportParams() {
+    const u = new URLSearchParams();
+    if (filters.view !== "all") u.set("view", filters.view);
+    if (filters.niche) u.set("niche", filters.niche);
+    if (filters.platform) u.set("sourcePlatform", filters.platform);
+    if (filters.search.trim()) u.set("q", filters.search.trim());
+    return u;
+  }
+  const exportCsvHref = `/api/export/products?${exportParams().toString()}`;
+  // "Proven winners" preset — mirrors the defaults in nicheiq_two_databases.sql.
+  // Kept inclusive on purpose: it filters on revenue (now populated for every
+  // marketplace, proxy-labeled where estimated) plus liveness, but NOT on
+  // ratingCount (Etsy has none) or minAgeDays (needs crawl history — would
+  // return nothing on day one). Add &minAgeDays=60 once the table has weeks of
+  // history to make the durability cut. Tune the bar with the team.
+  const exportWinnersHref = (() => {
+    const u = exportParams();
+    u.set("view", "market");
+    u.set("minRevenue", "2000");
+    u.set("maxDaysSinceLastSeen", "21");
+    return `/api/export/products?${u.toString()}`;
+  })();
+
   function clearAllFilters() {
     setSearchInput("");
     startTransition(() => router.replace(pathname, { scroll: false }));
@@ -88,17 +115,41 @@ export function ProductsView({ products, total, counts, filters }: Props) {
               : `${products.length} of ${total} tracked across all sources.`
         }
         actions={
-          filters.view === "mine" && counts.mine > 0 ? (
-            // "Export PDF" only appears in the Mine view, and only when
-            // there's something to export. Opens the print-optimized
-            // page in a new tab; the page auto-fires window.print() so
-            // the user just confirms "Save as PDF" in the browser dialog.
+          <div className="flex items-center gap-2">
+            {/* Proven-winners preset — only meaningful for market products. */}
+            {filters.view === "market" ? (
+              <Button asChild size="sm" variant="outline">
+                <a href={exportWinnersHref} download>
+                  <Trophy className="mr-1 h-4 w-4" /> Export winners
+                </a>
+              </Button>
+            ) : null}
+            {/* Styled .xlsx — Top Candidates / All Products / By Niche.
+                Matches the opportunities workbook; ignores UI filters (it's
+                the complete Database 1 picture, real market products only). */}
             <Button asChild size="sm" variant="outline">
-              <Link href="/portfolio-pdf" target="_blank" rel="noopener">
-                <FileDown className="mr-1 h-4 w-4" /> Export PDF
-              </Link>
+              <a href="/api/export/products-workbook" download>
+                <FileSpreadsheet className="mr-1 h-4 w-4" /> Export workbook
+              </a>
             </Button>
-          ) : undefined
+            {/* Faithful CSV of whatever's currently filtered, in any view. */}
+            <Button asChild size="sm" variant="outline">
+              <a href={exportCsvHref} download>
+                <FileDown className="mr-1 h-4 w-4" /> Export CSV
+              </a>
+            </Button>
+            {/* "Export PDF" only in the Mine view, and only when there's
+                something to export. Opens the print-optimized page in a new
+                tab; it auto-fires window.print() so the user just confirms
+                "Save as PDF" in the browser dialog. */}
+            {filters.view === "mine" && counts.mine > 0 ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/portfolio-pdf" target="_blank" rel="noopener">
+                  <FileDown className="mr-1 h-4 w-4" /> Export PDF
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

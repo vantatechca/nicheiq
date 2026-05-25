@@ -1,4 +1,5 @@
 import type { CrawlerModule, RawSignal } from "./types";
+import { estimateFromSales, revenueBasisTag } from "./revenue";
 
 interface EnvatoItem {
   id: number;
@@ -46,26 +47,37 @@ const envato: CrawlerModule = {
   },
   normalize(parsed: unknown[]): RawSignal[] {
     const items = parsed as EnvatoItem[];
-    return items.map((it) => ({
-      sourcePlatform: "envato",
-      sourceUrl: it.url,
-      sourceId: String(it.id),
-      title: it.name,
-      snippet: it.summary,
-      priceUsd: it.price_cents / 100,
-      ratingAvg: it.rating.rating,
-      ratingCount: it.rating.count,
-      tags: [it.classification, it.site],
-      thumbnailUrl: it.previews.icon_with_landscape_preview?.landscape_url,
-      estMonthlySales: { low: 0, high: it.number_of_sales },
-      capturedAt: new Date(it.published_at).toISOString(),
-      creator: {
-        handle: it.author_username,
-        displayName: it.author_username,
-        profileUrl: it.author_url,
-      },
-      rawJson: it as unknown as Record<string, unknown>,
-    }));
+    return items.map((it) => {
+      const priceUsd = it.price_cents / 100;
+      // number_of_sales is LIFETIME; convert to a monthly rate via publish date
+      // rather than passing the lifetime total through as if it were monthly.
+      const est = estimateFromSales({
+        totalSales: it.number_of_sales,
+        publishedAtIso: it.published_at,
+        priceUsd,
+      });
+      return {
+        sourcePlatform: "envato",
+        sourceUrl: it.url,
+        sourceId: String(it.id),
+        title: it.name,
+        snippet: it.summary,
+        priceUsd,
+        ratingAvg: it.rating.rating,
+        ratingCount: it.rating.count,
+        tags: [it.classification, it.site, revenueBasisTag(est.basis)],
+        thumbnailUrl: it.previews.icon_with_landscape_preview?.landscape_url,
+        estMonthlySales: est.sales,
+        estMonthlyRevenue: est.revenue,
+        capturedAt: new Date(it.published_at).toISOString(),
+        creator: {
+          handle: it.author_username,
+          displayName: it.author_username,
+          profileUrl: it.author_url,
+        },
+        rawJson: it as unknown as Record<string, unknown>,
+      };
+    });
   },
 };
 

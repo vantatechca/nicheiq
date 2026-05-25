@@ -1,0 +1,263 @@
+import ExcelJS from "exceljs";
+import { PALETTE, thinBorder, titleCase, tierColor } from "./workbook-style";
+
+/**
+ * Builds the boss-ready PRODUCTS workbook (Database 1) — the proven winners —
+ * with three styled sheets that match the Opportunities workbook exactly:
+ *   • Top Candidates — highest-revenue products (≥ floor), with a totals row
+ *   • All Products   — every real product, ranked by LAST SEEN (freshest first)
+ *   • By Niche       — demand scoreboard: count / avg revenue / total revenue
+ *
+ * Pure: takes already-fetched rows, returns an .xlsx buffer. No DB, no auth.
+ */
+
+export interface ProductRow {
+  title: string;
+  niche: string;
+  platform: string; // sourcePlatform
+  sales: number | null; // representative est. monthly sales
+  revenue: number | null; // representative est. monthly revenue (USD)
+  basis: string; // revenueBasis — how the figure was derived
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+}
+
+interface NicheRow {
+  niche: string;
+  count: number;
+  avgRevenue: number;
+  totalRevenue: number;
+}
+
+// A "very high success" product floors at $2k/mo estimated revenue — same bar
+// as the products "Export winners" preset.
+const CANDIDATE_FLOOR = 2000;
+const TOP_N = 15;
+
+// Revenue highlight thresholds (monthly USD): green = strong, amber = solid.
+const REV_GREEN_AT = 5000;
+const REV_AMBER_AT = 1500;
+
+const TITLE_ARGB = PALETTE.title;
+const SUBTITLE_ARGB = PALETTE.subtitle;
+const HEADER_FILL_ARGB = PALETTE.header;
+const BAND_ARGB = PALETTE.band;
+const TOTAL_FILL_ARGB = PALETTE.total;
+
+const PRODUCT_HEADERS = [
+  "Rank",
+  "Product",
+  "Niche",
+  "Platform",
+  "Est. Sales / mo",
+  "Est. Revenue / mo ($)",
+  "Revenue Basis",
+  "Last Seen",
+  "First Seen",
+];
+const PRODUCT_WIDTHS = [6, 48, 18, 14, 14, 18, 16, 12, 12];
+
+function addProductSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  subtitle: string,
+  data: ProductRow[],
+  withTotals: boolean,
+) {
+  const ws = wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 4 }] });
+  PRODUCT_WIDTHS.forEach((w, i) => (ws.getColumn(i + 1).width = w));
+
+  ws.mergeCells("A1:I1");
+  const title = ws.getCell("A1");
+  title.value = "NicheIQ — Proven Product Winners";
+  title.font = { bold: true, size: 16, color: { argb: TITLE_ARGB } };
+  ws.getRow(1).height = 24;
+
+  ws.mergeCells("A2:I2");
+  const sub = ws.getCell("A2");
+  sub.value = subtitle;
+  sub.font = { italic: true, size: 10, color: { argb: SUBTITLE_ARGB } };
+
+  const headerRow = ws.getRow(4);
+  PRODUCT_HEADERS.forEach((h, i) => {
+    const c = headerRow.getCell(i + 1);
+    c.value = h;
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL_ARGB } };
+    c.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+    // Numeric / date columns (5–9) right-aligned, text columns left.
+    c.alignment = { vertical: "middle", horizontal: i >= 4 ? "right" : "left" };
+    c.border = thinBorder;
+  });
+  headerRow.height = 18;
+
+  data.forEach((r, idx) => {
+    const row = ws.getRow(5 + idx);
+    row.getCell(1).value = idx + 1;
+    row.getCell(2).value = r.title;
+    row.getCell(3).value = titleCase(r.niche);
+    row.getCell(4).value = titleCase(r.platform);
+
+    const sales = row.getCell(5);
+    sales.value = r.sales ?? 0;
+    sales.numFmt = "#,##0";
+    sales.alignment = { horizontal: "right" };
+
+    const rev = row.getCell(6);
+    rev.value = r.revenue ?? 0;
+    rev.numFmt = '"$"#,##0';
+    rev.font = {
+      bold: true,
+      color: { argb: tierColor(r.revenue ?? 0, REV_GREEN_AT, REV_AMBER_AT) },
+    };
+    rev.alignment = { horizontal: "right" };
+
+    row.getCell(7).value = titleCase(r.basis);
+    row.getCell(7).alignment = { horizontal: "right" };
+
+    const last = row.getCell(8);
+    last.value = r.lastSeenAt;
+    last.numFmt = "yyyy-mm-dd";
+    last.alignment = { horizontal: "right" };
+
+    const first = row.getCell(9);
+    first.value = r.firstSeenAt;
+    first.numFmt = "yyyy-mm-dd";
+    first.alignment = { horizontal: "right" };
+
+    const band = idx % 2 === 1;
+    for (let col = 1; col <= 9; col++) {
+      const c = row.getCell(col);
+      c.border = thinBorder;
+      if (band) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BAND_ARGB } };
+    }
+  });
+
+  const lastDataRow = 4 + data.length;
+  if (data.length) {
+    ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: lastDataRow, column: 9 } };
+  }
+
+  if (withTotals && data.length) {
+    const totals = ws.getRow(lastDataRow + 1);
+    totals.getCell(2).value = "Totals / Averages";
+    const salesSum = data.reduce((s, r) => s + (r.sales ?? 0), 0);
+    const revSum = data.reduce((s, r) => s + (r.revenue ?? 0), 0);
+
+    const salesCell = totals.getCell(5);
+    salesCell.value = salesSum;
+    salesCell.numFmt = "#,##0";
+    salesCell.alignment = { horizontal: "right" };
+
+    const revCell = totals.getCell(6);
+    revCell.value = revSum;
+    revCell.numFmt = '"$"#,##0';
+    revCell.alignment = { horizontal: "right" };
+
+    for (let col = 1; col <= 9; col++) {
+      const c = totals.getCell(col);
+      c.font = { bold: true };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_FILL_ARGB } };
+      c.border = thinBorder;
+    }
+  }
+}
+
+function addNicheSheet(wb: ExcelJS.Workbook, data: NicheRow[]) {
+  const ws = wb.addWorksheet("By Niche", { views: [{ state: "frozen", ySplit: 3 }] });
+  [22, 16, 18, 22].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+
+  ws.mergeCells("A1:D1");
+  const title = ws.getCell("A1");
+  title.value = "Winners by niche (live data)";
+  title.font = { bold: true, size: 14, color: { argb: TITLE_ARGB } };
+
+  const headers = ["Niche", "# Products", "Avg Revenue ($)", "Total Est. Revenue ($)"];
+  const headerRow = ws.getRow(3);
+  headers.forEach((h, i) => {
+    const c = headerRow.getCell(i + 1);
+    c.value = h;
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL_ARGB } };
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    c.alignment = { horizontal: i >= 1 ? "right" : "left" };
+    c.border = thinBorder;
+  });
+
+  data.forEach((n, idx) => {
+    const row = ws.getRow(4 + idx);
+    row.getCell(1).value = titleCase(n.niche);
+    row.getCell(2).value = n.count;
+    row.getCell(2).alignment = { horizontal: "right" };
+    const avg = row.getCell(3);
+    avg.value = n.avgRevenue;
+    avg.numFmt = '"$"#,##0';
+    avg.alignment = { horizontal: "right" };
+    const tot = row.getCell(4);
+    tot.value = n.totalRevenue;
+    tot.numFmt = '"$"#,##0';
+    tot.alignment = { horizontal: "right" };
+
+    const band = idx % 2 === 1;
+    for (let col = 1; col <= 4; col++) {
+      const c = row.getCell(col);
+      c.border = thinBorder;
+      if (band) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BAND_ARGB } };
+    }
+  });
+
+  if (data.length) {
+    ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + data.length, column: 4 } };
+  }
+}
+
+/** Aggregate rows into the by-niche scoreboard, sorted by product count desc. */
+export function aggregateByNiche(rows: ProductRow[]): NicheRow[] {
+  const map = new Map<string, { count: number; revenue: number }>();
+  for (const r of rows) {
+    const m = map.get(r.niche) ?? { count: 0, revenue: 0 };
+    m.count += 1;
+    m.revenue += r.revenue ?? 0;
+    map.set(r.niche, m);
+  }
+  return [...map.entries()]
+    .map(([niche, m]) => ({
+      niche,
+      count: m.count,
+      avgRevenue: Math.round(m.revenue / m.count),
+      totalRevenue: Math.round(m.revenue),
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Build the products workbook from all real product rows. Top Candidates is
+ * sorted by revenue (the success metric); All Products is ranked by last seen
+ * (freshest first), per the boss's spec. Returns an .xlsx buffer.
+ */
+export async function buildProductWorkbook(allRows: ProductRow[]): Promise<ArrayBuffer> {
+  const byRevenue = [...allRows].sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0));
+  const topRows = byRevenue.filter((r) => (r.revenue ?? 0) >= CANDIDATE_FLOOR).slice(0, TOP_N);
+  const byLastSeen = [...allRows].sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime());
+  const byNiche = aggregateByNiche(allRows);
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "NicheIQ";
+  wb.created = new Date();
+
+  addProductSheet(
+    wb,
+    "Top Candidates",
+    `Top ${topRows.length} highest-revenue products (≥ $${CANDIDATE_FLOOR.toLocaleString()}/mo est.), of ${allRows.length} live products. Sorted by est. revenue.`,
+    topRows,
+    true,
+  );
+  addProductSheet(
+    wb,
+    "All Products",
+    `All ${allRows.length} live products, ranked by last seen (freshest first). Seed/demo excluded.`,
+    byLastSeen,
+    false,
+  );
+  addNicheSheet(wb, byNiche);
+
+  return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+}

@@ -1,4 +1,5 @@
 import type { CrawlerModule, RawSignal } from "./types";
+import { estimateFromProxy, PROXY_CONVERSION, revenueBasisTag } from "./revenue";
 
 const ETSY_API_BASE = "https://openapi.etsy.com/v3/application";
 
@@ -82,15 +83,27 @@ const etsy: CrawlerModule = {
       if (seen.has(sourceId)) continue;
       seen.add(sourceId);
 
+      const priceUsd = l.price.amount / l.price.divisor;
+      // Etsy's API exposes no sales count, so we proxy demand from favourites —
+      // a weak signal, hence low end 0 and a "favorites-proxy" label.
+      const est = estimateFromProxy({
+        proxyCount: l.num_favorers ?? 0,
+        priceUsd,
+        basis: "favorites-proxy",
+        conversion: PROXY_CONVERSION.favorites,
+      });
+
       signals.push({
         sourcePlatform: "etsy",
         sourceId,
         sourceUrl: l.url,
         title: l.title,
         snippet: l.description?.slice(0, 280) || undefined,
-        priceUsd: l.price.amount / l.price.divisor,
+        priceUsd,
+        estMonthlySales: est.sales,
+        estMonthlyRevenue: est.revenue,
         capturedAt: new Date(l.creation_timestamp * 1000).toISOString(),
-        tags: (l.tags ?? []).slice(0, 12),
+        tags: [...(l.tags ?? []).slice(0, 11), revenueBasisTag(est.basis)],
         thumbnailUrl: l.images?.[0]?.url_fullxfull,
         creator: l.shop ? { handle: l.shop.shop_name, profileUrl: l.shop.url } : undefined,
         rawJson: l as unknown as Record<string, unknown>,

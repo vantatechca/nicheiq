@@ -16,7 +16,7 @@ export const searchQuerySchema = paginationSchema.extend({
   sourcePlatform: z.string().optional(),
   type: z.string().optional(),
   buildEffort: z.string().optional(),
-  sort: z.enum(["score", "newest", "revenue"]).optional(),
+  sort: z.enum(["score", "newest", "revenue", "niche"]).optional(),
 });
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>;

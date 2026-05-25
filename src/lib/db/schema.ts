@@ -370,6 +370,11 @@ export const signals = pgTable(
     snippet: text("snippet").notNull(),
     engagement: jsonb("engagement").notNull(),
     score: real("score").notNull().default(0),
+    // firstSeenAt is set once on first insert and NEVER overwritten on re-crawl
+    // (the upsert below leaves it out of its SET clause). processedAt continues
+    // to be bumped to now() on every re-crawl, so it doubles as "last seen".
+    // Together they give the first-seen / last-seen pair the feed relies on.
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
     processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
     ideaIdsLinked: text("idea_ids_linked")
       .array()
@@ -380,6 +385,7 @@ export const signals = pgTable(
     sourceIdIdx: uniqueIndex("signals_source_idx").on(t.sourcePlatform, t.sourceId),
     nicheIdx: index("signals_niche_idx").on(t.niche),
     processedAtIdx: index("signals_processed_at_idx").on(t.processedAt),
+    firstSeenAtIdx: index("signals_first_seen_at_idx").on(t.firstSeenAt),
   }),
 );
 

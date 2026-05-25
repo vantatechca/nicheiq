@@ -10,7 +10,7 @@
 import { useEffect, useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Filter, Sparkles, Sun, X } from "lucide-react";
+import { Download, Filter, Sparkles, Sun, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +87,22 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     setSearchInput("");
     startTransition(() => router.replace(pathname, { scroll: false }));
   }
+
+  // Database 2 export — the "all opportunities, classed by niche" deliverable.
+  // Carries the current filters, defaults to the worth-a-try set (status
+  // tracking) when no status is chosen, and groups by niche. Hits /api/export,
+  // which now excludes seeds and adds cloneDifficulty + firstSeen columns.
+  const exportByNicheHref = (() => {
+    const u = new URLSearchParams();
+    if (filters.niche) u.set("niche", filters.niche);
+    if (filters.type) u.set("type", filters.type);
+    if (filters.effort) u.set("buildEffort", filters.effort);
+    u.set("status", filters.status ?? "tracking");
+    if (filters.minScore > 0) u.set("minScore", String(filters.minScore));
+    if (filters.search.trim()) u.set("q", filters.search.trim());
+    u.set("sort", "niche");
+    return `/api/export?${u.toString()}`;
+  })();
 
   const allOnPage = opportunities.map((o) => o.id);
   const allSelected = selected.size > 0 && allOnPage.every((id) => selected.has(id));
@@ -186,6 +202,11 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
                 });
               }}
             />
+            <Button asChild size="sm" variant="outline">
+              <a href={exportByNicheHref} download>
+                <Download className="mr-1 h-4 w-4" /> Export by niche
+              </a>
+            </Button>
             <Button size="sm" variant="outline" onClick={handleSynthesize} disabled={synthesizing}>
               <Sparkles className="mr-1 h-4 w-4" />
               {synthesizing
@@ -275,10 +296,18 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
               </Link>
             </Button>
           ) : null}
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Shortlisted", "shortlisted")}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => bulkAction("Shortlisted", "shortlisted")}
+          >
             Shortlist
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Marked building", "building")}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => bulkAction("Marked building", "building")}
+          >
             Mark building
           </Button>
           <Button size="sm" variant="outline" onClick={() => bulkAction("Abandoned", "abandoned")}>
