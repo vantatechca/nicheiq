@@ -107,7 +107,7 @@ export default function CreatorDetailPage() {
               try {
                 const res = await fetch(`/api/creators/${c.id}/deep-dive`, { method: "POST" });
                 if (!res.ok) throw new Error("Failed");
-                toast.success("Deep dive complete — refreshing…");
+                toast.success("Deep dive complete — added to Competitors. Refreshing…");
                 setTimeout(() => window.location.reload(), 1000);
               } catch {
                 toast.error("Deep dive failed");

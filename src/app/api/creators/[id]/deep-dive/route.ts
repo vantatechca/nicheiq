@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { creators, products } from "@/lib/db/schema";
+import { competitors, creators, products } from "@/lib/db/schema";
 import { ok, notFound, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 import { selectModel } from "@/lib/ai/client";
@@ -72,5 +72,31 @@ Output their playbook as JSON:
     .set({ playbook, lastEnrichedAt: new Date() })
     .where(eq(creators.id, params.id));
 
-  return ok({ playbook });
+  // A deep dive *is* adding the creator to the deep watchlist — track them as
+  // a competitor using the playbook we just generated. No unique index on
+  // creatorId, so check first; refresh the playbook on a repeat dive rather
+  // than creating duplicates.
+  const [existingComp] = await db
+    .select({ id: competitors.id })
+    .from(competitors)
+    .where(eq(competitors.creatorId, params.id))
+    .limit(1);
+
+  if (existingComp) {
+    await db
+      .update(competitors)
+      .set({ playbook, depth: "deep", lastReviewedAt: new Date() })
+      .where(eq(competitors.id, existingComp.id));
+  } else {
+    await db.insert(competitors).values({
+      id: `comp_${Date.now()}`,
+      creatorId: params.id,
+      depth: "deep",
+      playbook,
+      notes: "",
+      lastReviewedAt: new Date(),
+    });
+  }
+
+  return ok({ playbook, tracked: true });
 }
