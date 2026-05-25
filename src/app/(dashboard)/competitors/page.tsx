@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink, FileSpreadsheet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,13 @@ export default function CompetitorsPage() {
       <PageHeader
         title="Competitors"
         description={`Curated deep-dive list — ${competitors.length} creators.`}
+        actions={
+          <Button asChild size="sm" variant="outline">
+            <a href="/api/export/competitors-workbook" download>
+              <FileSpreadsheet className="mr-1 h-4 w-4" /> Export workbook
+            </a>
+          </Button>
+        }
       />
 
       {cError ? (
