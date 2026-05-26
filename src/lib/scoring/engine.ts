@@ -61,7 +61,7 @@ export function compute(input: ScoreInputs): ScoreBreakdown {
       demand: {
         value: dimensions.demand,
         weight: DEFAULT_WEIGHTS.demand,
-        rationale: "Search volume + social mentions + sales-velocity proxies.",
+        rationale: "Signal breadth + engagement intensity (upvotes/votes/favourites) + trend.",
       },
       competition: {
         value: dimensions.competition,
@@ -91,6 +91,18 @@ export function compute(input: ScoreInputs): ScoreBreakdown {
   };
 }
 
+/**
+ * Average engagement across an opportunity's linked signals, on the same 0-100
+ * scale that `_persist-signals` already stores in `signals.score` (a log-scaled
+ * blend of upvotes / votes / favourites / comments). Pure + null-safe so it's
+ * unit-testable and tolerant of seed rows that predate the score column.
+ */
+export function aggregateSignalEngagement(signals: Array<{ score?: number | null }>): number {
+  if (!signals.length) return 0;
+  const sum = signals.reduce((acc, s) => acc + (Number(s.score) || 0), 0);
+  return clamp(sum / signals.length, 0, 100);
+}
+
 // Heuristic helpers: derive dimensions from raw signals, used until real crawlers run.
 //
 // Base values are tuned so a totally evidence-less opportunity (zero signals,
@@ -106,9 +118,29 @@ export function dimensionsFromHeuristics(input: {
   estMonthlyRevenueHigh?: number;
   competitorListings?: number;
   buildEffortKey: string;
+  /**
+   * Mean per-signal engagement (0-100) across the opportunity's linked signals.
+   * Optional and ADDITIVE: omit it and demand falls back to the previous
+   * count-only behaviour (so existing snapshots/tests are unaffected).
+   */
+  avgEngagement?: number;
 }): DimensionInputs {
-  const demand = clamp(5 + input.signalCount * 6 + Math.max(0, input.trendGrowthPct), 0, 100);
-  const competition = clamp(20 + (input.competitorListings ?? 0) * 4, 0, 100);
+  // Demand = breadth (how many signals) + intensity (how engaged those signals
+  // are) + trend. The intensity term is what makes 3 threads at 5k upvotes beat
+  // 3 threads at 5 upvotes — previously they scored identically. At the 0.35
+  // factor a red-hot niche (avg 90) adds ~31 points; a lukewarm one (avg 10)
+  // adds ~3, so it differentiates without swamping the breadth/trend signals.
+  const intensity = input.avgEngagement != null ? clamp(input.avgEngagement, 0, 100) * 0.35 : 0;
+  const demand = clamp(
+    5 + input.signalCount * 6 + intensity + Math.max(0, input.trendGrowthPct),
+    0,
+    100,
+  );
+  // Competition rises with how crowded the niche is. Log-scaled because real
+  // marketplace listing counts span single digits to thousands — the old linear
+  // `* 4` pegged almost every niche at max. Now: empty=20, 10≈43, 100≈64,
+  // 1000≈86, saturating gracefully.
+  const competition = clamp(20 + Math.log10(1 + (input.competitorListings ?? 0)) * 22, 0, 100);
   // No revenue estimate → ~0 (was: defaulted to $1000 and gave ~31).
   const revenue = clamp(Math.log10(Math.max(1, input.estMonthlyRevenueHigh ?? 0)) * 22, 0, 100);
   const trend = clamp(25 + input.trendGrowthPct, 0, 100);

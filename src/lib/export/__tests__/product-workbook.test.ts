@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
-import { aggregateByNiche, buildProductWorkbook, type ProductRow } from "../product-workbook";
+import {
+  aggregateByNiche,
+  aggregateByNicheWithBasis,
+  buildProductWorkbook,
+  type ProductRow,
+} from "../product-workbook";
 
 function mockRow(over: Partial<ProductRow> = {}): ProductRow {
   return {
@@ -37,6 +42,30 @@ describe("aggregateByNiche (products)", () => {
   it("treats null revenue as 0", () => {
     const agg = aggregateByNiche([mockRow({ revenue: null })]);
     expect(agg[0]!.totalRevenue).toBe(0);
+  });
+});
+
+describe("aggregateByNicheWithBasis", () => {
+  it("splits sales-derived revenue from total and counts real rows", () => {
+    const rows = [
+      mockRow({ niche: "wordpress_theme", revenue: 1000, basis: "sales-derived" }),
+      mockRow({ niche: "wordpress_theme", revenue: 4000, basis: "sales-derived" }),
+      mockRow({ niche: "wordpress_theme", revenue: 6000, basis: "favorites-proxy" }),
+    ];
+    const n = aggregateByNicheWithBasis(rows)[0]!;
+    expect(n.count).toBe(3);
+    expect(n.realCount).toBe(2);
+    expect(n.salesDerivedRevenue).toBe(5000); // the two sales-derived only
+    expect(n.totalRevenue).toBe(11000); // all three
+  });
+
+  it("ranks by real revenue, so proxy noise can't vault a niche up", () => {
+    const rows = [
+      mockRow({ niche: "a", revenue: 500, basis: "sales-derived" }),
+      mockRow({ niche: "b", revenue: 50, basis: "sales-derived" }),
+      mockRow({ niche: "b", revenue: 100000, basis: "favorites-proxy" }),
+    ];
+    expect(aggregateByNicheWithBasis(rows)[0]!.niche).toBe("a");
   });
 });
 

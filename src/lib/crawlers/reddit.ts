@@ -29,6 +29,10 @@ const DEFAULT_SUBS = [
   "datasets",
 ];
 
+// "hot" = current attention; add "top" (with a time window) via config to catch
+// the proven high-demand threads over the last week/month.
+const DEFAULT_LISTINGS = ["hot"];
+
 const USER_AGENT = "nicheiq-bot/0.1 (research; contact andrei@nicheiq.com)";
 
 interface RedditPost {
@@ -43,6 +47,11 @@ interface RedditPost {
     created_utc: number;
     url: string;
   };
+}
+
+interface RedditRow {
+  post: RedditPost;
+  via: string; // which listing surfaced it (provenance)
 }
 
 // Cached OAuth token. Reddit client-credentials tokens last ~1 hour.
@@ -78,49 +87,84 @@ async function getRedditToken(): Promise<string | null> {
   return cachedToken.value;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const reddit: CrawlerModule = {
   source: "reddit",
   requiresHeadless: false,
+
   async crawl({ config }) {
     const subs = (config.subs as string[] | undefined) ?? DEFAULT_SUBS;
+    const listings = (config.listings as string[] | undefined) ?? DEFAULT_LISTINGS;
     const limit = (config.limit as number | undefined) ?? 25;
+    const topWindow = (config.topWindow as string | undefined) ?? "week"; // hour|day|week|month|year|all
+    const delayMs = (config.perRequestDelayMs as number | undefined) ?? 150;
+    const maxRequests = (config.maxRequests as number | undefined) ?? 80;
 
     // Prefer OAuth (100 req/min/account). Fall back to public JSON (~10 req/min/IP)
-    // only when credentials aren't configured — public JSON is heavily rate-limited.
+    // only when credentials aren't configured.
     const token = await getRedditToken();
     const baseHost = token ? "https://oauth.reddit.com" : "https://www.reddit.com";
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
     if (token) headers.authorization = `Bearer ${token}`;
 
-    const results = await Promise.all(
-      subs.map(async (sub) => {
-        const res = await fetch(`${baseHost}/r/${sub}/hot.json?limit=${limit}`, {
+    const combos: Array<{ sub: string; listing: string }> = [];
+    for (const sub of subs) for (const listing of listings) combos.push({ sub, listing });
+    const capped = combos.slice(0, maxRequests);
+
+    // Sequential with a small gap — safe for both the OAuth and (gentler)
+    // public-JSON paths, and a per-request try/catch keeps one bad sub from
+    // sinking the whole crawl.
+    const rows: RedditRow[] = [];
+    for (const { sub, listing } of capped) {
+      const qs = new URLSearchParams({ limit: String(limit) });
+      if (listing === "top") qs.set("t", topWindow);
+      try {
+        const res = await fetch(`${baseHost}/r/${sub}/${listing}.json?${qs}`, {
           headers,
           signal: AbortSignal.timeout(10_000),
         });
-        if (!res.ok) return { sub, posts: [] };
-        const json = (await res.json()) as { data: { children: RedditPost[] } };
-        return { sub, posts: json.data.children };
-      }),
-    );
-    return results;
+        if (res.ok) {
+          const json = (await res.json()) as { data?: { children?: RedditPost[] } };
+          for (const p of json.data?.children ?? []) rows.push({ post: p, via: listing });
+        }
+      } catch {
+        // network/timeout on one sub — skip and continue
+      }
+      await sleep(delayMs);
+    }
+
+    return rows;
   },
+
   parse(raw: unknown) {
-    const groups = raw as { sub: string; posts: RedditPost[] }[];
-    return groups.flatMap((g) => g.posts);
+    return raw as RedditRow[];
   },
+
   normalize(parsed: unknown[]): RawSignal[] {
-    const posts = parsed as RedditPost[];
-    return posts.map((p) => ({
-      sourcePlatform: "reddit",
-      sourceUrl: `https://reddit.com${p.data.permalink}`,
-      sourceId: p.data.id,
-      title: p.data.title,
-      snippet: p.data.selftext.slice(0, 280),
-      capturedAt: new Date(p.data.created_utc * 1000).toISOString(),
-      tags: [p.data.subreddit],
-      rawJson: p.data as unknown as Record<string, unknown>,
-    }));
+    const rows = parsed as RedditRow[];
+    const seen = new Set<string>();
+    const signals: RawSignal[] = [];
+
+    for (const { post: p, via } of rows) {
+      const d = p.data;
+      if (seen.has(d.id)) continue; // same post can appear in hot AND top
+      seen.add(d.id);
+
+      signals.push({
+        sourcePlatform: "reddit",
+        sourceUrl: `https://reddit.com${d.permalink}`,
+        sourceId: d.id,
+        title: d.title,
+        snippet: (d.selftext ?? "").slice(0, 280),
+        capturedAt: new Date(d.created_utc * 1000).toISOString(),
+        // upvotes + comments are the demand signal — keep them queryable.
+        tags: [d.subreddit, `via:${via}`, `score:${d.score}`, `comments:${d.num_comments}`],
+        rawJson: d as unknown as Record<string, unknown>,
+      });
+    }
+
+    return signals;
   },
 };
 
