@@ -1,16 +1,9 @@
 "use client";
 
-// Client component — receives filtered opportunities + filter state from the
-// server component as props. Updates URL params on filter changes, which causes
-// the server component to re-render with new data.
-//
-// Search input is debounced locally before pushing to URL. Selection state
-// stays in client state (useState) since it's purely UI.
-
 import { useEffect, useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Download, Filter, Sparkles, Sun, X } from "lucide-react";
+import { FileSpreadsheet, Filter, Sparkles, Sun, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,10 +44,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
-  // Local search state — debounced before pushing to URL.
   const [searchInput, setSearchInput] = useState(filters.search);
-
-  // Selection state — purely client-side.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const updateFilter = useCallback(
@@ -76,7 +66,6 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     [filters, pathname, router],
   );
 
-  // Debounce search input → URL
   useEffect(() => {
     if (searchInput === filters.search) return;
     const t = setTimeout(() => updateFilter({ search: searchInput }), 300);
@@ -88,23 +77,20 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     startTransition(() => router.replace(pathname, { scroll: false }));
   }
 
-  // Database 2 export — the "all opportunities, classed by niche" deliverable.
-  // Carries the current filters, defaults to the worth-a-try set (status
-  // tracking) when no status is chosen, and groups by niche. Hits /api/export,
-  // which now excludes seeds and adds cloneDifficulty + firstSeen columns.
-  const exportByNicheHref = (() => {
+  // Build the workbook download URL — carries current filters so the export
+  // matches exactly what's on screen.
+  const workbookHref = (() => {
     const u = new URLSearchParams();
-    if (filters.niche) u.set("niche", filters.niche);
-    if (filters.type) u.set("type", filters.type);
-    if (filters.effort) u.set("buildEffort", filters.effort);
-    u.set("status", filters.status ?? "tracking");
-    if (filters.minScore > 0) u.set("minScore", String(filters.minScore));
-    if (filters.search.trim()) u.set("q", filters.search.trim());
-    u.set("sort", "niche");
-    return `/api/export?${u.toString()}`;
+    if (filters.niche)            u.set("niche",      filters.niche);
+    if (filters.type)             u.set("type",       filters.type);
+    if (filters.effort)           u.set("buildEffort", filters.effort);
+    if (filters.status)           u.set("status",     filters.status ?? "tracking");
+    if (filters.minScore > 0)     u.set("minScore",   String(filters.minScore));
+    if (filters.search.trim())    u.set("q",          filters.search.trim());
+    return `/api/opportunities/workbook?${u.toString()}`;
   })();
 
-  const allOnPage = opportunities.map((o) => o.id);
+  const allOnPage  = opportunities.map((o) => o.id);
   const allSelected = selected.size > 0 && allOnPage.every((id) => selected.has(id));
 
   function toggleAll() {
@@ -156,7 +142,6 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
         toast.info("Synthesis runs against live data only — nothing to do in mock mode.");
       } else {
         toast.success(`Synthesizing new opportunities${scopeLabel} — they'll appear in a moment.`);
-        // Refresh the list after the job has had time to persist.
         setTimeout(() => startTransition(() => router.refresh()), 8000);
       }
     } catch (err) {
@@ -202,11 +187,15 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
                 });
               }}
             />
+
+            {/* Workbook export — replaces the old "Export by niche" CSV link */}
             <Button asChild size="sm" variant="outline">
-              <a href={exportByNicheHref} download>
-                <Download className="mr-1 h-4 w-4" /> Export by niche
+              <a href={workbookHref} download>
+                <FileSpreadsheet className="mr-1 h-4 w-4" />
+                Export workbook
               </a>
             </Button>
+
             <Button size="sm" variant="outline" onClick={handleSynthesize} disabled={synthesizing}>
               <Sparkles className="mr-1 h-4 w-4" />
               {synthesizing
