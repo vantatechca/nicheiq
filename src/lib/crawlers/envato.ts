@@ -9,7 +9,9 @@ const SEARCH_ENDPOINT = "https://api.envato.com/v1/discovery/search/search/item"
 //   themeforest.net  — site & marketing templates
 //   codecanyon.net   — plugins & scripts
 //   photodune / videohive / audiojungle / 3docean — stock media
-const DEFAULT_SITES = ["graphicriver.net", "themeforest.net"];
+// All three design-asset sites are defaults so the scheduled cron (which passes
+// no `sites`) crawls the same marketplaces the live test proved out.
+const DEFAULT_SITES = ["graphicriver.net", "themeforest.net", "codecanyon.net"];
 
 // "trending" = rising right now, "sales" = proven lifetime winners. Pulling
 // both gives the dashboard a hot/established pair per site.

@@ -193,12 +193,6 @@ function addNicheSheet(wb: ExcelJS.Workbook, data: NicheBreakdown[]) {
   title.value = "Demand by niche (live data)";
   title.font = { bold: true, size: 14, color: { argb: TITLE_ARGB } };
 
-  ws.mergeCells("A2:E2");
-  const note = ws.getCell("A2");
-  note.value =
-    "Sales-Derived = real money from Envato lifetime-sales estimates. Total includes weaker proxy estimates — trust the sales-derived column.";
-  note.font = { italic: true, size: 9, color: { argb: SUBTITLE_ARGB } };
-
   const headers = [
     "Niche",
     "# Products",
