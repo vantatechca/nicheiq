@@ -53,9 +53,11 @@ export default function CreatorDetailPage() {
   const [deepDiving, setDeepDiving] = useState(false);
   const { id } = useParams<{ id: string }>();
 
-  const { data: creatorData, loading } = useApi<{ creator: Creator }>(
-    id ? `/api/creators/${id}` : null,
-  );
+  const {
+    data: creatorData,
+    loading,
+    error,
+  } = useApi<{ creator: Creator }>(id ? `/api/creators/${id}` : null);
   const c = creatorData?.creator ?? null;
 
   const { data: productsData } = useApi<{ products: Product[] }>(
@@ -64,6 +66,10 @@ export default function CreatorDetailPage() {
   const products = (productsData?.products ?? []).filter((p) => p.creatorId === c?.id);
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading creator…</div>;
+  if (error && error.status !== 404)
+    return (
+      <div className="p-6 text-sm text-red-400">Couldn&apos;t load creator: {error.message}</div>
+    );
   if (!c) return <div className="p-6 text-sm text-slate-400">Creator not found.</div>;
 
   const playbook = c.playbook ?? {};

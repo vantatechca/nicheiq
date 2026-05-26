@@ -78,9 +78,11 @@ export default function ProductDetailPage() {
   const [promoting, setPromoting] = useState(false);
   const { id } = useParams<{ id: string }>();
 
-  const { data: productData, loading } = useApi<{ product: Product }>(
-    id ? `/api/products/${id}` : null,
-  );
+  const {
+    data: productData,
+    loading,
+    error,
+  } = useApi<{ product: Product }>(id ? `/api/products/${id}` : null);
   const product = productData?.product ?? null;
 
   const { data: creatorData } = useApi<{ creator: Creator }>(
@@ -117,6 +119,10 @@ export default function ProductDetailPage() {
   };
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading product…</div>;
+  if (error && error.status !== 404)
+    return (
+      <div className="p-6 text-sm text-red-400">Couldn&apos;t load product: {error.message}</div>
+    );
   if (!product) return <div className="p-6 text-sm text-slate-400">Product not found.</div>;
 
   const isMine = !!product.opportunityId;
@@ -166,7 +172,9 @@ export default function ProductDetailPage() {
           <Card className="overflow-hidden border-slate-800 bg-slate-900/40">
             <div
               className="relative flex aspect-[16/9] items-end bg-slate-800"
-              style={!product.thumbnailUrl ? { background: nicheGradient(product.niche) } : undefined}
+              style={
+                !product.thumbnailUrl ? { background: nicheGradient(product.niche) } : undefined
+              }
             >
               {product.thumbnailUrl ? (
                 <img
@@ -230,7 +238,10 @@ export default function ProductDetailPage() {
                         )
                   }
                 />
-                <Stat label={isMine ? "Launched" : "First seen"} value={timeAgo(product.createdAt)} />
+                <Stat
+                  label={isMine ? "Launched" : "First seen"}
+                  value={timeAgo(product.createdAt)}
+                />
               </div>
             </CardContent>
           </Card>

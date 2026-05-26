@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "@/lib/types";
 
 interface SendArgs {
@@ -17,8 +17,24 @@ export function useBrainChat(initial: Message[] = []) {
   const [aiMode, setAiMode] = useState<"live" | "mock" | "mock-fallback" | undefined>();
   const [aiWarning, setAiWarning] = useState<string | undefined>();
 
+  // Synchronous in-flight guard. `pending` state can't be read inside this
+  // callback (stable [] deps → always stale), so a ref is the reliable way to
+  // reject re-entry — e.g. ⌘+Enter spam starting overlapping streams, which
+  // also double-bills against the daily AI spend cap.
+  const inFlightRef = useRef(false);
+
+  // Aborts the in-flight stream when the component using this hook unmounts, so
+  // we don't keep reading (and billing) a response nobody will see, or write
+  // state after unmount.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   const send = useCallback(async (args: SendArgs) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setPending(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
     const userMsg: Message = {
       id: `local_${crypto.randomUUID()}`,
       conversationId: args.conversationId ?? "local",
@@ -41,6 +57,7 @@ export function useBrainChat(initial: Message[] = []) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(args),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error("Request failed");
       const cid = res.headers.get("x-conversation-id");
@@ -60,6 +77,8 @@ export function useBrainChat(initial: Message[] = []) {
         );
       }
     } catch (err) {
+      // Intentional abort (unmount) — drop silently; the message won't be seen.
+      if (controller.signal.aborted) return;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -68,6 +87,8 @@ export function useBrainChat(initial: Message[] = []) {
         ),
       );
     } finally {
+      inFlightRef.current = false;
+      if (abortRef.current === controller) abortRef.current = null;
       setPending(false);
     }
   }, []);

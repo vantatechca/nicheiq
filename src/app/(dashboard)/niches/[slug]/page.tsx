@@ -64,9 +64,13 @@ interface NicheDetailResponse {
 
 export default function NicheDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { data, loading } = useApi<NicheDetailResponse>(slug ? `/api/niches/${slug}` : null);
+  const { data, loading, error } = useApi<NicheDetailResponse>(slug ? `/api/niches/${slug}` : null);
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading niche…</div>;
+  if (error && error.status !== 404)
+    return (
+      <div className="p-6 text-sm text-red-400">Couldn&apos;t load niche: {error.message}</div>
+    );
   if (!data?.niche) return <div className="p-6 text-sm text-slate-400">Niche not found.</div>;
 
   const { niche: n, opportunities, products, creators, trends, signals } = data;

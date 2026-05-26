@@ -142,9 +142,11 @@ function normalizeBuildPlan(raw: unknown) {
 export default function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
 
-  const { data: oppData, loading } = useApi<{ opportunity: Opportunity }>(
-    id ? `/api/opportunities/${id}` : null,
-  );
+  const {
+    data: oppData,
+    loading,
+    error,
+  } = useApi<{ opportunity: Opportunity }>(id ? `/api/opportunities/${id}` : null);
   const opp = oppData?.opportunity ?? null;
 
   const { data: similarData } = useApi<{ opportunities: Opportunity[] }>(
@@ -189,6 +191,12 @@ export default function OpportunityDetailPage() {
   }
 
   if (loading) return <div className="p-6 text-sm text-slate-400">Loading opportunity…</div>;
+  if (error && error.status !== 404)
+    return (
+      <div className="p-6 text-sm text-red-400">
+        Couldn&apos;t load opportunity: {error.message}
+      </div>
+    );
   if (!opp) return <div className="p-6 text-sm text-slate-400">Opportunity not found.</div>;
 
   const buildPlan = normalizeBuildPlan(opp.aiBuildPlan);

@@ -46,6 +46,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
 
   const [searchInput, setSearchInput] = useState(filters.search);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, setBulkPending] = useState(false);
 
   const updateFilter = useCallback(
     (patch: Partial<Filters>) => {
@@ -81,16 +82,16 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
   // matches exactly what's on screen.
   const workbookHref = (() => {
     const u = new URLSearchParams();
-    if (filters.niche)            u.set("niche",      filters.niche);
-    if (filters.type)             u.set("type",       filters.type);
-    if (filters.effort)           u.set("buildEffort", filters.effort);
-    if (filters.status)           u.set("status",     filters.status ?? "tracking");
-    if (filters.minScore > 0)     u.set("minScore",   String(filters.minScore));
-    if (filters.search.trim())    u.set("q",          filters.search.trim());
+    if (filters.niche) u.set("niche", filters.niche);
+    if (filters.type) u.set("type", filters.type);
+    if (filters.effort) u.set("buildEffort", filters.effort);
+    if (filters.status) u.set("status", filters.status ?? "tracking");
+    if (filters.minScore > 0) u.set("minScore", String(filters.minScore));
+    if (filters.search.trim()) u.set("q", filters.search.trim());
     return `/api/opportunities/workbook?${u.toString()}`;
   })();
 
-  const allOnPage  = opportunities.map((o) => o.id);
+  const allOnPage = opportunities.map((o) => o.id);
   const allSelected = selected.size > 0 && allOnPage.every((id) => selected.has(id));
 
   function toggleAll() {
@@ -106,7 +107,8 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
   }
 
   async function bulkAction(label: string, status: string) {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || bulkPending) return;
+    setBulkPending(true);
     const ids = Array.from(selected);
     try {
       const res = await fetch("/api/opportunities/bulk-status", {
@@ -121,6 +123,8 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
       startTransition(() => router.refresh());
     } catch (err) {
       toast.error(`Couldn't update: ${(err as Error).message}`);
+    } finally {
+      setBulkPending(false);
     }
   }
 
@@ -288,6 +292,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           <Button
             size="sm"
             variant="outline"
+            disabled={bulkPending}
             onClick={() => bulkAction("Shortlisted", "shortlisted")}
           >
             Shortlist
@@ -295,14 +300,25 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           <Button
             size="sm"
             variant="outline"
+            disabled={bulkPending}
             onClick={() => bulkAction("Marked building", "building")}
           >
             Mark building
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Abandoned", "abandoned")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkPending}
+            onClick={() => bulkAction("Abandoned", "abandoned")}
+          >
             Abandon
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulkAction("Archived", "archived")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkPending}
+            onClick={() => bulkAction("Archived", "archived")}
+          >
             Archive
           </Button>
           <Button

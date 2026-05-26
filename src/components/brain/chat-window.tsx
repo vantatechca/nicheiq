@@ -70,6 +70,7 @@ export function ChatWindow({
   }, [messages]);
 
   function submit() {
+    if (pending) return;
     const trimmed = input.trim();
     if (!trimmed) return;
     setInput("");
