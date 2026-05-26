@@ -4,7 +4,7 @@ import * as reddit from "./reddit";
 import * as productHunt from "./product-hunt";
 import * as hackerNews from "./hacker-news";
 import * as kaggle from "./kaggle";
-import * as etsy from "./etsy";
+// import * as etsy from "./etsy";
 import * as gumroad from "./gumroad";
 
 export const CRAWLERS: Partial<Record<string, CrawlerModule>> = {
@@ -13,7 +13,7 @@ export const CRAWLERS: Partial<Record<string, CrawlerModule>> = {
   product_hunt: productHunt.default,
   hacker_news: hackerNews.default,
   kaggle: kaggle.default,
-  etsy: etsy.default,
+  // etsy: etsy.default,
   gumroad: gumroad.default,
 };
 
