@@ -1,39 +1,51 @@
 import type { CrawlerModule, RawSignal } from "./types";
-import { estimateFromProxy, PROXY_CONVERSION, revenueBasisTag } from "./revenue";
 
-const ETSY_API_BASE = "https://openapi.etsy.com/v3/application";
+const APIFY_BASE = "https://api.apify.com/v2";
+const ACTOR_ID   = "automation-lab~etsy-scraper";
 
 const DEFAULT_KEYWORDS = [
-  "digital download",
-  "notion template",
-  "procreate brushes",
-  "printable planner",
   "canva template",
-  "social media template",
-  "lightroom preset",
+  "notion template",
+  "printable planner",
   "svg cut file",
+  "lightroom preset",
+  "social media template",
   "resume template",
+  "procreate brush",
+  "digital planner",
   "excel template",
 ];
 
-interface EtsyListing {
-  listing_id: number;
-  title: string;
-  description: string;
-  url: string;
-  tags: string[];
-  price: { amount: number; divisor: number; currency_code: string };
-  num_favorers: number;
-  views: number;
-  creation_timestamp: number;
-  is_digital: boolean;
-  images?: Array<{ url_fullxfull: string }>;
-  shop?: { shop_name: string; url: string };
+// Output shape from automation-lab~etsy-scraper
+interface ApifyEtsyItem {
+  listingId?:     string | number;
+  name?:          string;
+  url?:           string;
+  price?:         string | number;
+  originalPrice?: string | null;
+  currency?:      string;
+  imageUrl?:      string;
+  shop?:          string;
+  shopId?:        string;
+  rating?:        number | null;
+  onSale?:        boolean;
+  freeShipping?:  boolean;
+  availability?:  string;
+  position?:      number;
+  query?:         string;
+  page?:          number;
+  scrapedAt?:     string;
 }
 
 interface EtsyPage {
   keyword: string;
-  results: EtsyListing[];
+  items:   ApifyEtsyItem[];
+}
+
+function parsePrice(raw: string | number | undefined): number | undefined {
+  if (raw == null) return undefined;
+  const n = parseFloat(String(raw).replace(/[^0-9.]/g, ""));
+  return isNaN(n) ? undefined : n;
 }
 
 const etsy: CrawlerModule = {
@@ -41,75 +53,87 @@ const etsy: CrawlerModule = {
   requiresHeadless: false,
 
   async crawl({ config }) {
-    const apiKey = process.env.ETSY_API_KEY;
-    if (!apiKey) throw new Error("ETSY_API_KEY missing");
+    const token = process.env.APIFY_TOKEN;
+    if (!token) throw new Error("APIFY_TOKEN missing — add it to .env.local");
 
     const keywords = (config.keywords as string[] | undefined) ?? DEFAULT_KEYWORDS;
-    const limit = (config.limit as number | undefined) ?? 50;
+    const limit    = (config.limit   as number | undefined)    ?? 50;
 
     const pages = await Promise.all(
       keywords.map(async (kw): Promise<EtsyPage> => {
-        const params = new URLSearchParams({
-          keywords: kw,
-          limit: String(Math.min(limit, 100)),
-          sort_on: "score",
-          sort_order: "desc",
+        const input = {
+          searchQuery: kw,
+          maxItems:    Math.min(limit, 100),
+          sort:        "most_relevant",
+          category:    "craft-supplies-and-tools",
+        };
+
+        const url =
+          `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items` +
+          `?token=${token}&timeout=120&memory=512`;
+
+        console.log(`[etsy-apify] running actor for: "${kw}"`);
+
+        const res = await fetch(url, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(input),
+          signal:  AbortSignal.timeout(130_000),
         });
-        const res = await fetch(`${ETSY_API_BASE}/listings/active?${params}`, {
-          headers: { "x-api-key": apiKey },
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!res.ok) return { keyword: kw, results: [] };
-        const json = await res.json();
-        return { keyword: kw, results: json.results ?? [] };
+
+        if (!res.ok) {
+          console.warn(`[etsy-apify] HTTP ${res.status} for "${kw}"`);
+          return { keyword: kw, items: [] };
+        }
+
+        const items = (await res.json()) as ApifyEtsyItem[];
+        console.log(`[etsy-apify] got ${items.length} items for "${kw}"`);
+        return { keyword: kw, items };
       }),
     );
 
     return pages;
   },
 
-  parse(raw: unknown) {
+  parse(raw: unknown): unknown[] {
     const pages = raw as EtsyPage[];
-    return pages.flatMap((p) => p.results.map((r) => ({ ...r, _keyword: p.keyword })));
+    return pages.flatMap((p) =>
+      p.items.map((item) => ({ ...item, _keyword: p.keyword }))
+    );
   },
 
   normalize(parsed: unknown[]): RawSignal[] {
-    const items = parsed as Array<EtsyListing & { _keyword: string }>;
-    const seen = new Set<string>();
+    const seen    = new Set<string>();
     const signals: RawSignal[] = [];
 
-    for (const l of items) {
-      const sourceId = String(l.listing_id);
+    for (const item of parsed) {
+      const r = item as ApifyEtsyItem & { _keyword: string };
+
+      const listingIdMatch = r.url?.match(/\/listing\/(\d+)/);
+      const sourceId =
+        r.listingId != null ? String(r.listingId) :
+        listingIdMatch?.[1]  ?? r.url;
+
+      if (!sourceId || !r.url || !r.name) continue;
       if (seen.has(sourceId)) continue;
       seen.add(sourceId);
-
-      const priceUsd = l.price.amount / l.price.divisor;
-      // Etsy's API exposes no sales count, so we proxy demand from favourites —
-      // a weak signal, hence low end 0 and a "favorites-proxy" label.
-      const est = estimateFromProxy({
-        proxyCount: l.num_favorers ?? 0,
-        priceUsd,
-        basis: "favorites-proxy",
-        conversion: PROXY_CONVERSION.favorites,
-      });
 
       signals.push({
         sourcePlatform: "etsy",
         sourceId,
-        sourceUrl: l.url,
-        title: l.title,
-        snippet: l.description?.slice(0, 280) || undefined,
-        priceUsd,
-        estMonthlySales: est.sales,
-        estMonthlyRevenue: est.revenue,
-        capturedAt: new Date(l.creation_timestamp * 1000).toISOString(),
-        tags: [...(l.tags ?? []).slice(0, 11), revenueBasisTag(est.basis)],
-        thumbnailUrl: l.images?.[0]?.url_fullxfull,
-        creator: l.shop ? { handle: l.shop.shop_name, profileUrl: l.shop.url } : undefined,
-        rawJson: l as unknown as Record<string, unknown>,
+        sourceUrl:    r.url,
+        title:        r.name,
+        priceUsd:     parsePrice(r.price),
+        ratingAvg:    r.rating != null ? Number(r.rating) : undefined,
+        capturedAt:   r.scrapedAt ?? new Date().toISOString(),
+        tags: [r._keyword, "digital-download"].filter((x): x is string => Boolean(x)),
+        thumbnailUrl: r.imageUrl ?? undefined,
+        creator:      r.shop ? { handle: r.shop, profileUrl: "" } : undefined,
+        rawJson:      r as unknown as Record<string, unknown>,
       });
     }
 
+    console.log(`[etsy-apify] normalized ${signals.length} signals`);
     return signals;
   },
 };
