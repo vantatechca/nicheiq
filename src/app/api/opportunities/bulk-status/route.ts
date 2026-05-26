@@ -3,10 +3,16 @@ import { NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { opportunities } from "@/lib/db/schema";
+import { requireSession } from "@/lib/auth/session";
+import { unauthorized } from "@/lib/api/response";
 
 type OppStatus = (typeof opportunities.status.enumValues)[number];
 
 export async function POST(req: Request) {
+  // Auth: middleware excludes /api/*, so every mutating route must guard itself.
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
   let body: { ids?: unknown; status?: unknown };
   try {
     body = await req.json();

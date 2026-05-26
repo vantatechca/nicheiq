@@ -19,8 +19,14 @@ import { getDb } from "@/lib/db/client";
 import { opportunities } from "@/lib/db/schema";
 import { buildOpportunityWorkbook, type OppRow } from "@/lib/export/opportunity-workbook";
 import type { SQL } from "drizzle-orm";
+import { requireSession } from "@/lib/auth/session";
+import { unauthorized } from "@/lib/api/response";
 
 export async function GET(req: NextRequest) {
+  // Auth: middleware excludes /api/*, so this export route must guard itself.
+  const session = await requireSession();
+  if (!session) return unauthorized();
+
   const sp       = req.nextUrl.searchParams;
   const niche    = sp.get("niche");
   const type     = sp.get("type");

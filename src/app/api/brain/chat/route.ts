@@ -309,12 +309,13 @@ export async function POST(req: NextRequest) {
     await persistMessage(conversationId, "user", parsed.data.message);
 
     // 4. Stream the assistant response, persisting on completion
+    const cacheableSystem = await assembleContext({
+      mode: parsed.data.mode,
+      refIds: parsed.data.contextRefs,
+      userId,
+    });
     stream = await streamLive({
-      cacheableSystem: assembleContext({
-        mode: parsed.data.mode,
-        refIds: parsed.data.contextRefs,
-        userId,
-      }),
+      cacheableSystem,
       history,
       message: parsed.data.message,
       signal: req.signal,

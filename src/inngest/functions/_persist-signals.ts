@@ -2,6 +2,12 @@ import { getDb } from "@/lib/db/client";
 import { nicheEnum, products, signals } from "@/lib/db/schema";
 import type { RawSignal } from "@/lib/crawlers/types";
 import { selectModel } from "@/lib/ai/client";
+import {
+  inferNiche,
+  safeNiche,
+  subredditHintFor,
+  type NicheValue,
+} from "@/lib/crawlers/niche-classify";
 import { sql } from "drizzle-orm";
 
 type SignalType =
@@ -10,13 +16,6 @@ type SignalType =
   | "launch"
   | "dataset_drop"
   | "expired_listing";
-
-// Niche values are derived directly from the schema enum so the classifier's
-// vocabulary always matches what the DB column accepts — no drift, no frozen
-// 20-value subset that dumps fonts/logos/etc. into "other".
-type NicheValue = (typeof nicheEnum.enumValues)[number];
-
-const VALID_NICHES = new Set<NicheValue>(nicheEnum.enumValues);
 
 const SIGNAL_TYPE: Record<string, SignalType> = {
   reddit: "social_mention",
@@ -53,46 +52,12 @@ export function isProductPlatform(platform: string): boolean {
   return PRODUCT_PLATFORMS.has(platform);
 }
 
-function safeNiche(v: string): NicheValue {
-  return VALID_NICHES.has(v as NicheValue) ? (v as NicheValue) : "other";
-}
-
-// ── Tier 1 batch niche classifier ─────────────────────────────────────────────
+// ── Tier 2 (Claude Haiku) batch niche classifier ──────────────────────────────
 
 async function classifyNiches(
   items: Array<{ title: string; snippet?: string; tags?: string[]; platform?: string }>,
 ): Promise<NicheValue[]> {
   if (!items.length) return [];
-
-  // Subreddit → niche direct mapping (no AI needed for these)
-  const subredditMap: Record<string, NicheValue> = {
-    Notion: "notion_template",
-    NotionTemplates: "notion_template",
-    EtsySellers: "etsy_printable",
-    Etsy: "etsy_printable",
-    KDP: "kdp_low_content",
-    selfpublishing: "kdp_low_content",
-    lightroom: "lightroom_preset",
-    gamedev: "game_asset",
-    gamedesign: "game_asset",
-    discordapp: "discord_bot",
-    WordpressPlugins: "wordpress_theme",
-    shopify: "shopify_app",
-    VideoEditing: "video_template",
-    datasets: "dataset",
-    ChatGPT: "ai_prompt_pack",
-    MidJourney: "ai_prompt_pack",
-    AIPromptEngineering: "ai_prompt_pack",
-    NoCode: "micro_saas",
-    nocode: "micro_saas",
-    microsaas: "micro_saas",
-    SaaS: "micro_saas",
-  };
-
-  const fallbackFor = (s: { tags?: string[] }): NicheValue => {
-    const sub = s.tags?.[0];
-    return sub ? (subredditMap[sub] ?? "other") : "other";
-  };
 
   const SYSTEM = `You are a digital product market classifier. Classify each item into exactly one niche.
 Valid niches (choose the single closest match): ${nicheEnum.enumValues.join(", ")}.
@@ -106,7 +71,7 @@ Routing rules:
 - After Effects / Premiere / motion / openers → motion_graphic; full edit templates → video_template; logo stings/intros → intro_template; LUTs → video_lut.
 - Audio loops/samples → sample_pack; drum kits → drum_kit; MIDI → midi_pack; SFX → sound_effect_pack.
 - Scripts / plugins / small tools → micro_saas or browser_extension as fits; Discord bots → discord_bot; game/Unity assets → game_asset or unity_asset.
-- Use the subreddit as a STRONG hint when present (r/Notion→notion_template, r/KDP→kdp_low_content, r/gamedev→game_asset, r/ChatGPT→chatgpt_prompt_pack, r/shopify→shopify_app, r/lightroom→lightroom_preset).
+- Use the subreddit as a STRONG hint when present (r/Notion→notion_template, r/KDP→kdp_low_content, r/gamedev→game_asset, r/ChatGPT→ai_prompt_pack, r/shopify→shopify_app, r/lightroom→lightroom_preset).
 - Only use "other" when nothing above fits at all.
 Output ONLY a JSON array of objects shaped {"i": <item number>, "niche": "<one valid niche>"}. No explanation. No markdown.`;
 
@@ -124,7 +89,8 @@ Output ONLY a JSON array of objects shaped {"i": <item number>, "niche": "<one v
     const list = chunk
       .map((s, i) => {
         const sub = s.tags?.[0]; // first tag is subreddit, if any
-        const hint = sub && subredditMap[sub] ? ` [HINT: likely ${subredditMap[sub]}]` : "";
+        const hintNiche = subredditHintFor(sub);
+        const hint = hintNiche ? ` [HINT: likely ${hintNiche}]` : "";
         const subTag = sub ? ` [subreddit: ${sub}]` : "";
         return `${i + 1}. "${s.title}"${subTag}${hint}`;
       })
@@ -170,14 +136,14 @@ Output ONLY a JSON array of objects shaped {"i": <item number>, "niche": "<one v
           `[persist-signals] niche chunk ${start}–${start + chunk.length}: ${missing} of ${chunk.length} unclassified — falling back for those only`,
         );
       }
-      chunk.forEach((s, i) => out.push(byIndex.get(i + 1) ?? fallbackFor(s)));
+      chunk.forEach((s, i) => out.push(byIndex.get(i + 1) ?? inferNiche(s)));
     } catch (err) {
       console.warn(
         `[persist-signals] niche chunk ${start}–${start + chunk.length} failed (${
           err instanceof Error ? err.message : String(err)
         }) — falling back for this chunk`,
       );
-      for (const s of chunk) out.push(fallbackFor(s));
+      for (const s of chunk) out.push(inferNiche(s));
     }
   }
 
@@ -261,7 +227,7 @@ function toProductRow(s: RawSignal, niche: string, now: Date) {
 export async function persistSignals(normalized: RawSignal[]): Promise<number> {
   if (!normalized.length) return 0;
 
-  // Classify niches in one batch call (Tier 1 — cheap + fast)
+  // Classify niches in one batch call (Tier 2 — Claude Haiku)
   const niches = await classifyNiches(
     normalized.map((s) => ({
       title: s.title,

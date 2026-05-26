@@ -55,7 +55,12 @@ export default function FeedPage() {
   }
 
   // Live updates over SSE (real-time).
-  const { items: liveItems, connected } = useSse<Signal>({
+  const {
+    items: liveItems,
+    connected,
+    failed: streamFailed,
+    retry: retryStream,
+  } = useSse<Signal>({
     url: "/api/feed/sse",
     enabled: !paused,
   });
@@ -86,12 +91,20 @@ export default function FeedPage() {
     { value: "expired_listing", label: "Expired listing" },
   ];
 
-  const status = paused ? "Paused" : connected ? "Streaming new signals" : "Reconnecting…";
+  const status = paused
+    ? "Paused"
+    : streamFailed
+      ? "Connection lost"
+      : connected
+        ? "Streaming new signals"
+        : "Reconnecting…";
   const statusDotClass = paused
     ? "bg-amber-400"
-    : connected
-      ? "animate-pulse-soft bg-emerald-400"
-      : "bg-slate-600";
+    : streamFailed
+      ? "bg-red-500"
+      : connected
+        ? "animate-pulse-soft bg-emerald-400"
+        : "bg-slate-600";
 
   return (
     <>
@@ -101,6 +114,15 @@ export default function FeedPage() {
           <span className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
             {status}
+            {streamFailed ? (
+              <button
+                type="button"
+                onClick={retryStream}
+                className="text-[11px] font-medium text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+              >
+                Reconnect
+              </button>
+            ) : null}
             {liveItems.length > 0 ? (
               <Badge variant="info" className="text-[10px]">
                 {liveItems.length} new
