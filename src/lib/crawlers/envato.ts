@@ -199,7 +199,22 @@ const envato: CrawlerModule = {
           displayName: it.author_username,
           profileUrl: it.author_url,
         },
-        rawJson: it as unknown as Record<string, unknown>,
+        // Trim to only what downstream actually reads. The full Envato item
+        // (long descriptions, every preview variant, classification URLs) is
+        // huge × up to 180 rows and blows past Inngest's per-step output size
+        // limit when passed through the crawl→parse→normalize→persist steps.
+        // persist reads none of these for Envato (it has no score/votes/
+        // favourites/comments fields), so we keep just the useful provenance.
+        rawJson: {
+          id: it.id,
+          site: it.site,
+          classification: it.classification,
+          number_of_sales: it.number_of_sales,
+          price_cents: it.price_cents,
+          rating: it.rating,
+          published_at: it.published_at,
+          trending: it.trending,
+        } as Record<string, unknown>,
       });
     }
 
