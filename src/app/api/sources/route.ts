@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
-import { asc } from "drizzle-orm";
 import { z } from "zod";
-import { getDb } from "@/lib/db/client";
-import { sources } from "@/lib/db/schema";
+import { listSources, createSource } from "@/lib/repos/sources";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
 
@@ -17,8 +15,7 @@ export async function GET(_req: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
 
-  const db = getDb();
-  const rows = await db.select().from(sources).orderBy(asc(sources.label));
+  const rows = await listSources();
   return ok({ sources: rows });
 }
 
@@ -35,19 +32,6 @@ export async function POST(req: NextRequest) {
   const parsed = newSourceSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid body", parsed.error.flatten());
 
-  const db = getDb();
-  const [source] = await db
-    .insert(sources)
-    .values({
-      id: `source_user_${Date.now()}`,
-      sourcePlatform: parsed.data
-        .sourcePlatform as (typeof sources.sourcePlatform.enumValues)[number],
-      label: parsed.data.label,
-      config: parsed.data.config ?? {},
-      enabled: true,
-      cronSchedule: parsed.data.cronSchedule ?? "0 */6 * * *",
-    })
-    .returning();
-
+  const source = await createSource(parsed.data);
   return created({ source });
 }

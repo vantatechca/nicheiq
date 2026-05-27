@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, notFound, unauthorized } from "@/lib/api/response";
 import { requireSession } from "@/lib/auth/session";
-import { getSource } from "@/lib/repos/sources";
+import { getSource, recordSourceRun } from "@/lib/repos/sources";
 import { isMockMode } from "@/lib/repos/mode";
 import { inngest } from "@/inngest/client";
 
@@ -14,12 +14,24 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-  if (!isMockMode()) {
-    // Real dispatch — the crawl-source Inngest function picks this up,
-    // runs the appropriate per-platform crawler, and persists signals.
+  if (isMockMode()) {
+    // No Inngest worker runs locally, so record a completed run directly. This
+    // gives the dashboard visible feedback (Last run / Status) in the demo.
+    await recordSourceRun(source.id, { status: "ok" });
+  } else {
+    // Mark the source running immediately for instant UI feedback, then dispatch.
+    // The crawl-source Inngest function runs the per-platform crawler, persists
+    // signals, and writes the final ok/error status back to this row.
+    // NOTE: send the platform (the crawler key) — a sourceId is not one.
+    await recordSourceRun(source.id, { status: "running" });
     await inngest.send({
       name: "crawl/source.requested",
-      data: { sourceId: source.id, runId },
+      data: {
+        sourceId: source.id,
+        platform: source.sourcePlatform,
+        config: source.config,
+        runId,
+      },
     });
   }
 
@@ -27,7 +39,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     job: {
       id: runId,
       sourceId: source.id,
-      status: "queued",
+      status: isMockMode() ? "ok" : "running",
       startedAt: new Date().toISOString(),
       itemsFound: 0,
       itemsNew: 0,

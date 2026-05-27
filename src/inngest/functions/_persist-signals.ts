@@ -27,30 +27,12 @@ const SIGNAL_TYPE: Record<string, SignalType> = {
   flippa: "expired_listing",
 };
 
-// Platforms whose crawled items are real PRODUCTS (a listing with a price,
-// rating, and revenue) rather than discussion/trend chatter. These get routed
-// into the `products` table — which carries first_seen_at / last_seen_at and
-// the revenue columns — instead of `signals`. Everything else (Reddit, HN,
-// Product Hunt launches, etc.) stays as a signal.
-//
-// Exported + pure so it can be unit-tested without a DB or AI call.
-const PRODUCT_PLATFORMS = new Set<string>([
-  "etsy",
-  "gumroad",
-  "creative_market",
-  "envato",
-  "design_bundles",
-  "kdp",
-  "redbubble",
-  "lemonsqueezy",
-  "sellfy",
-  "payhip",
-  "teachers_pay_teachers",
-]);
-
-export function isProductPlatform(platform: string): boolean {
-  return PRODUCT_PLATFORMS.has(platform);
-}
+// Product- vs trend-platform classification lives in a shared, dependency-free
+// module so the Sources UI and this persistence layer route by one definition.
+// Re-exported here so existing importers (and tests) of `_persist-signals`
+// keep working.
+export { isProductPlatform, PRODUCT_PLATFORMS } from "@/lib/crawlers/platform-kind";
+import { isProductPlatform } from "@/lib/crawlers/platform-kind";
 
 // ── Tier 2 (Claude Haiku) batch niche classifier ──────────────────────────────
 

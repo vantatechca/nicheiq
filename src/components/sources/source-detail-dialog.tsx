@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Source } from "@/lib/types";
+import { api } from "@/lib/api-client/fetcher";
 import { SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import { timeAgo } from "@/lib/utils/format";
 
@@ -25,12 +26,42 @@ interface Props {
   source: Source;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after a successful save so the parent list can refetch. */
+  onChanged?: () => void;
 }
 
-export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
+export function SourceDetailDialog({ source, open, onOpenChange, onChanged }: Props) {
   const platform = SOURCE_PLATFORMS.find((p) => p.value === source.sourcePlatform);
   const [enabled, setEnabled] = useState(source.enabled);
   const [cron, setCron] = useState(source.cronSchedule);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  async function runTestCrawl() {
+    setTesting(true);
+    try {
+      await api.post(`/api/sources/${source.id}/test-crawl`);
+      toast.info("Crawl queued…", { description: "Results will appear in signals." });
+    } catch (err) {
+      toast.error((err as Error).message || "Crawl failed to queue");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function saveConfig() {
+    setSaving(true);
+    try {
+      await api.patch(`/api/sources/${source.id}`, { enabled, cronSchedule: cron });
+      toast.success("Config saved");
+      onChanged?.();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error((err as Error).message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   // Mock crawl history for the modal
   const recentRuns = [
@@ -116,10 +147,7 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
               </div>
               <Switch
                 checked={enabled}
-                onCheckedChange={(v) => {
-                  setEnabled(v);
-                  toast.success(v ? "Source enabled" : "Source paused");
-                }}
+                onCheckedChange={setEnabled}
               />
             </div>
             <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3">
@@ -191,22 +219,11 @@ export function SourceDetailDialog({ source, open, onOpenChange }: Props) {
         </Tabs>
 
         <DialogFooter className="border-t border-slate-800 pt-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.info("Test crawl queued (mock)");
-            }}
-          >
-            <Play className="mr-1 h-3 w-3" /> Test crawl
+          <Button variant="outline" onClick={runTestCrawl} disabled={testing}>
+            <Play className="mr-1 h-3 w-3" /> {testing ? "Queuing…" : "Test crawl"}
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.success("Config saved");
-              onOpenChange(false);
-            }}
-          >
-            <Settings className="mr-1 h-3 w-3" /> Save config
+          <Button variant="outline" onClick={saveConfig} disabled={saving}>
+            <Settings className="mr-1 h-3 w-3" /> {saving ? "Saving…" : "Save config"}
           </Button>
         </DialogFooter>
       </DialogContent>

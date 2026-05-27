@@ -7,7 +7,14 @@ export const inngest = new Inngest({
 });
 
 export type Events = {
-  "crawl/source.requested": { data: { sourceId: string; runId?: string } };
+  "crawl/source.requested": {
+    data: {
+      sourceId?: string;
+      platform?: string;
+      config?: Record<string, unknown>;
+      runId?: string;
+    };
+  };
   "product/enrich.requested": { data: { productId: string } };
   "opportunity/score.requested": { data: { opportunityId: string } };
   "opportunity/synthesize.batch": { data: { niche?: string } };

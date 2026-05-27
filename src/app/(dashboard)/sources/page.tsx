@@ -29,20 +29,16 @@ import { SourceDetailDialog } from "@/components/sources/source-detail-dialog";
 import { useApi } from "@/lib/hooks/use-api";
 import { api } from "@/lib/api-client/fetcher";
 import { timeAgo } from "@/lib/utils/format";
-import { SOURCE_PLATFORMS } from "@/lib/utils/constants";
+import { SOURCE_PLATFORMS, WIRED_CRAWLER_PLATFORMS } from "@/lib/utils/constants";
 import type { Source } from "@/lib/types";
 
-// Only platforms that have a real crawler module — creating a source for any
-// other platform would produce a no-op that never pulls data.
-const CRAWLER_PLATFORMS = [
-  { value: "reddit", label: "Reddit" },
-  { value: "hacker_news", label: "Hacker News" },
-  { value: "product_hunt", label: "Product Hunt" },
-  { value: "kaggle", label: "Kaggle" },
-  { value: "envato", label: "Envato" },
-  { value: "etsy", label: "Etsy" },
-  { value: "gumroad", label: "Gumroad" },
-] as const;
+// Derived from the registry's source of truth so this picker can never drift
+// out of sync with what actually has a working crawler. Pulls label + icon
+// from SOURCE_PLATFORMS so there's no duplicated metadata to maintain.
+const CRAWLER_PLATFORMS = WIRED_CRAWLER_PLATFORMS.map((value) => {
+  const meta = SOURCE_PLATFORMS.find((p) => p.value === value);
+  return { value, label: meta?.label ?? value };
+});
 
 export default function SourcesPage() {
   const [search, setSearch] = useState("");
@@ -84,6 +80,101 @@ export default function SourcesPage() {
       s.label.toLowerCase().includes(search.toLowerCase()) ||
       s.sourcePlatform.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // Group by each platform's declared category (marketplace / asset / trend)
+  // so the dashboard mirrors how you think about sources. Falls back to "other"
+  // for any platform without a known category, so nothing is ever hidden.
+  const categoryOf = (s: Source): string =>
+    SOURCE_PLATFORMS.find((p) => p.value === s.sourcePlatform)?.category ?? "other";
+
+  function renderCard(s: Source) {
+    const platformMeta = SOURCE_PLATFORMS.find((p) => p.value === s.sourcePlatform);
+    return (
+      <Card
+        key={s.id}
+        className="cursor-pointer border-slate-800 bg-slate-900/40 transition hover:border-primary/40"
+        onClick={() => setDetail(s)}
+      >
+        <CardHeader className="flex flex-row items-start justify-between pb-2">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="text-lg">{platformMeta?.icon}</span> {s.label}
+            </CardTitle>
+            <CardDescription className="capitalize">{platformMeta?.category}</CardDescription>
+          </div>
+          <Switch
+            checked={s.enabled}
+            onCheckedChange={() => toggle(s.id, s.enabled)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </CardHeader>
+        <CardContent className="space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Status</span>
+            <Badge
+              variant={
+                s.lastRunStatus === "ok"
+                  ? "success"
+                  : s.lastRunStatus === "error"
+                    ? "destructive"
+                    : s.lastRunStatus === "running"
+                      ? "info"
+                      : "outline"
+              }
+            >
+              {s.lastRunStatus}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Cron</span>
+            <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px]">
+              {s.cronSchedule}
+            </code>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Last run</span>
+            <span>{s.lastRunAt ? timeAgo(s.lastRunAt) : "—"}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Items tracked</span>
+            <span className="font-mono">{s.itemsTracked}</span>
+          </div>
+          {s.requiresHeadless ? (
+            <Badge variant="warning" className="text-[10px]">
+              headless required
+            </Badge>
+          ) : null}
+          {s.lastError ? (
+            <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-2 text-[11px] text-rose-200">
+              {s.lastError}
+            </div>
+          ) : null}
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                testCrawl(s.id);
+              }}
+            >
+              <Play className="mr-1 h-3 w-3" /> Test crawl
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDetail(s);
+              }}
+            >
+              <Settings className="mr-1 h-3 w-3" /> Config
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   async function toggle(id: string, currentEnabled: boolean) {
     const next = !currentEnabled;
@@ -137,104 +228,52 @@ export default function SourcesPage() {
         <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
           No sources configured yet. Add one to start collecting signals.
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+          No sources match “{search}”.
+        </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((s) => {
-          const platformMeta = SOURCE_PLATFORMS.find((p) => p.value === s.sourcePlatform);
-          return (
-            <Card
-              key={s.id}
-              className="cursor-pointer border-slate-800 bg-slate-900/40 transition hover:border-primary/40"
-              onClick={() => setDetail(s)}
-            >
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
-                <div className="min-w-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <span className="text-lg">{platformMeta?.icon}</span> {s.label}
-                  </CardTitle>
-                  <CardDescription className="capitalize">{platformMeta?.category}</CardDescription>
-                </div>
-                <Switch
-                  checked={s.enabled}
-                  onCheckedChange={() => toggle(s.id, s.enabled)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Status</span>
-                  <Badge
-                    variant={
-                      s.lastRunStatus === "ok"
-                        ? "success"
-                        : s.lastRunStatus === "error"
-                          ? "destructive"
-                          : s.lastRunStatus === "running"
-                            ? "info"
-                            : "outline"
-                    }
-                  >
-                    {s.lastRunStatus}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Cron</span>
-                  <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px]">
-                    {s.cronSchedule}
-                  </code>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Last run</span>
-                  <span>{s.lastRunAt ? timeAgo(s.lastRunAt) : "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Items tracked</span>
-                  <span className="font-mono">{s.itemsTracked}</span>
-                </div>
-                {s.requiresHeadless ? (
-                  <Badge variant="warning" className="text-[10px]">
-                    headless required
-                  </Badge>
-                ) : null}
-                {s.lastError ? (
-                  <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-2 text-[11px] text-rose-200">
-                    {s.lastError}
-                  </div>
-                ) : null}
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      testCrawl(s.id);
-                    }}
-                  >
-                    <Play className="mr-1 h-3 w-3" /> Test crawl
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetail(s);
-                    }}
-                  >
-                    <Settings className="mr-1 h-3 w-3" /> Config
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {(
+        [
+          {
+            key: "marketplace",
+            title: "Marketplaces",
+            hint: "Digital-product listings — tracked with price, rating, and revenue.",
+          },
+          {
+            key: "asset",
+            title: "Assets",
+            hint: "Datasets, APIs, and other reusable building blocks.",
+          },
+          {
+            key: "trend",
+            title: "Trend sources",
+            hint: "Discussions, launches, and early demand signals.",
+          },
+          { key: "other", title: "Other", hint: "Sources without a known category." },
+        ] as const
+      ).map((group) => {
+        const items = filtered.filter((s) => categoryOf(s) === group.key);
+        if (items.length === 0) return null;
+        return (
+          <section key={group.key} className="mb-6">
+            <div className="mb-1 flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold text-slate-200">{group.title}</h2>
+              <span className="font-mono text-xs text-slate-500">{items.length}</span>
+            </div>
+            <p className="mb-3 text-xs text-slate-500">{group.hint}</p>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{items.map(renderCard)}</div>
+          </section>
+        );
+      })}
 
       {detail ? (
         <SourceDetailDialog
           source={detail}
           open={detail !== null}
           onOpenChange={(o) => !o && setDetail(null)}
+          onChanged={refetch}
         />
       ) : null}
 

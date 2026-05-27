@@ -105,6 +105,21 @@ export const SOURCE_PLATFORMS = [
 
 export type SourcePlatform = (typeof SOURCE_PLATFORMS)[number]["value"];
 
+// Platforms that have a real, enabled crawler module today. This is the
+// client-safe source of truth for the "New source" picker — the registry
+// (src/lib/crawlers/registry.ts) imports server-only crawler code and must
+// not be pulled into client bundles. KEEP THIS IN SYNC WITH `CRAWLERS` there.
+// Note: gumroad is intentionally excluded — its module exists but is disabled
+// (ToS-sensitive, no discovery API), so offering it would create dead sources.
+export const WIRED_CRAWLER_PLATFORMS = [
+  "reddit",
+  "hacker_news",
+  "product_hunt",
+  "kaggle",
+  "envato",
+  "etsy",
+] as const satisfies readonly SourcePlatform[];
+
 export const NICHE_LIST = [
   { value: "print_on_demand", label: "Print-on-demand", parent: null },
   { value: "etsy_printable", label: "Etsy printables", parent: null },

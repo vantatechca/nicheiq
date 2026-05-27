@@ -1,13 +1,20 @@
 import { inngest } from "../client";
 import { getCrawler } from "@/lib/crawlers/registry";
-import { getDb } from "@/lib/db/client";
-import { products } from "@/lib/db/schema";
-import type { RawSignal } from "@/lib/crawlers/types";
-import { inferNiche } from "@/lib/crawlers/niche-classify";
-import { sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { getSource, recordSourceRun } from "@/lib/repos/sources";
+import { persistSignals } from "./_persist-signals";
 
 // ── crawlSource function ──────────────────────────────────────────────────────
+//
+// Handles the on-demand "Test crawl" event. Mirrors the cron crawlers
+// (crawl-etsy / crawl-envato / …): resolve the platform, then crawl → parse →
+// normalize → persistSignals inside ONE step. persistSignals routes each item
+// to the right table (products for marketplace listings, signals for trend
+// chatter) and classifies niches — so this no longer hand-rolls a products-only
+// upsert, which mis-filed trend platforms (Reddit/HN/PH) into `products`.
+//
+// Keeping crawl+persist in a single step avoids passing the (potentially large)
+// normalized array across an Inngest step boundary, which can exceed the
+// per-step serialized-output cap.
 
 export const crawlSource = inngest.createFunction(
   { id: "crawl-source", retries: 3, concurrency: { limit: 5 } },
@@ -15,116 +22,84 @@ export const crawlSource = inngest.createFunction(
   async ({ event, step }) => {
     const {
       sourceId,
-      platform,
-      config = {},
+      platform: platformInput,
+      config: configInput,
     } = event.data as {
       sourceId?: string;
       platform?: string;
       config?: Record<string, unknown>;
     };
 
-    const crawlerKey = platform ?? sourceId;
+    // Resolve which crawler to run + its config. Prefer an explicit platform;
+    // otherwise look it up from the source record. A sourceId is NOT a crawler
+    // key, so we must never use it as one.
+    const resolved = await step.run("resolve-source", async () => {
+      if (platformInput) {
+        return { platform: platformInput, config: configInput ?? {} };
+      }
+      if (sourceId) {
+        const src = await getSource(sourceId);
+        if (src) {
+          return {
+            platform: src.sourcePlatform as string,
+            config: configInput ?? src.config ?? {},
+          };
+        }
+      }
+      return { platform: null as string | null, config: configInput ?? {} };
+    });
 
-    const job = await step.run("create-job-record", async () => ({
-      id: `job_${Date.now()}`,
-      sourceId: crawlerKey,
-      status: "running" as const,
-      startedAt: new Date().toISOString(),
-    }));
+    const crawlerKey = resolved.platform;
+    const config = resolved.config;
 
-    // ── fetch-items ─────────────────────────────────────────────────────────
-    const fetchResult = await step.run("fetch-items", async () => {
-      if (!crawlerKey) return { itemsFound: 0, itemsNew: 0, signals: [] as RawSignal[] };
+    if (!crawlerKey) {
+      console.log(`[crawl-source] could not resolve a platform (sourceId=${sourceId ?? "none"})`);
+      if (sourceId) {
+        await step.run("record-no-platform", () =>
+          recordSourceRun(sourceId, { status: "error", error: "No crawler platform resolved" }),
+        );
+      }
+      return { sourceId: sourceId ?? null, platform: null, itemsFound: 0, saved: 0, error: "no-platform" };
+    }
 
+    const result = await step.run("crawl-and-persist", async () => {
       const crawler = getCrawler(crawlerKey);
       if (!crawler) {
-        console.log(`[debug] no crawler for: ${crawlerKey}`);
-        return { itemsFound: 0, itemsNew: 0, signals: [] as RawSignal[] };
+        const msg = `No crawler registered for "${crawlerKey}"`;
+        console.log(`[crawl-source] ${msg}`);
+        return { itemsFound: 0, saved: 0, error: msg };
       }
 
-      console.log(`[debug] crawler found: ${crawlerKey}, calling crawl()`);
-      const raw = await crawler.crawl({ config });
-      console.log(
-        `[debug] raw type:`,
-        typeof raw,
-        Array.isArray(raw) ? `length=${(raw as unknown[]).length}` : "",
+      try {
+        const raw = await crawler.crawl({ config });
+        const parsed = crawler.parse(raw);
+        const signals = crawler.normalize(parsed);
+        const savedCount = await persistSignals(signals);
+        return { itemsFound: signals.length, saved: savedCount, error: null as string | null };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Crawl failed";
+        console.error(`[crawl-source] crawl failed for "${crawlerKey}": ${msg}`);
+        return { itemsFound: 0, saved: 0, error: msg };
+      }
+    });
+
+    // Write the outcome back to the source row so the dashboard reflects it.
+    if (sourceId) {
+      await step.run("record-run", () =>
+        recordSourceRun(sourceId, {
+          status: result.error ? "error" : "ok",
+          itemsAdded: result.saved,
+          error: result.error,
+        }),
       );
-      const parsed = crawler.parse(raw);
-      console.log(`[debug] parsed length:`, parsed.length);
-      const signals = crawler.normalize(parsed);
-      console.log(`[debug] signals length:`, signals.length);
-
-      return { itemsFound: signals.length, itemsNew: signals.length, signals };
-    });
-
-    // ── persist-and-emit-enrichments ────────────────────────────────────────
-    const persistResult = await step.run("persist-and-emit-enrichments", async () => {
-      const signals = fetchResult.signals as RawSignal[];
-      if (signals.length === 0) return { upserted: 0 };
-
-      const db = getDb();
-      let upserted = 0;
-
-      const BATCH = 50;
-      for (let i = 0; i < signals.length; i += BATCH) {
-        const batch = signals.slice(i, i + BATCH);
-
-        const rows = batch.map((s) => ({
-          // products.id is a plain text PK — generate a stable UUID per source URL
-          id: randomUUID(),
-          sourcePlatform: s.sourcePlatform,
-          sourceUrl: s.sourceUrl,
-          title: s.title,
-          // products.creator is text (not an object)
-          creator: s.creator?.handle ?? null,
-          creatorId: s.creator?.profileUrl ?? null,
-          priceUsd: s.priceUsd ?? null,
-          ratingAvg: s.ratingAvg ?? null,
-          ratingCount: s.ratingCount ?? null,
-          estMonthlySalesLow: s.estMonthlySales?.low ?? null,
-          estMonthlySalesHigh: s.estMonthlySales?.high ?? null,
-          estMonthlyRevenueLow: s.estMonthlyRevenue?.low ?? null,
-          estMonthlyRevenueHigh: s.estMonthlyRevenue?.high ?? null,
-          // niche is NOT NULL — infer via the shared canonical classifier
-          niche: inferNiche({ title: s.title, tags: s.tags, snippet: s.snippet, niche: s.niche }),
-          tags: s.tags ?? [],
-          thumbnailUrl: s.thumbnailUrl ?? null,
-          rawJson: s.rawJson,
-          // firstSeenAt / lastSeenAt — both default to now() on insert
-        }));
-
-        await db
-          .insert(products)
-          .values(rows as (typeof products.$inferInsert)[])
-          .onConflictDoUpdate({
-            // Unique index is on (source_platform, source_url)
-            target: [products.sourcePlatform, products.sourceUrl],
-            set: {
-              title: sql`excluded.title`,
-              priceUsd: sql`excluded.price_usd`,
-              ratingAvg: sql`excluded.rating_avg`,
-              ratingCount: sql`excluded.rating_count`,
-              thumbnailUrl: sql`excluded.thumbnail_url`,
-              tags: sql`excluded.tags`,
-              estMonthlySalesLow: sql`excluded.est_monthly_sales_low`,
-              estMonthlySalesHigh: sql`excluded.est_monthly_sales_high`,
-              estMonthlyRevenueLow: sql`excluded.est_monthly_revenue_low`,
-              estMonthlyRevenueHigh: sql`excluded.est_monthly_revenue_high`,
-              // bump lastSeenAt on every re-crawl; firstSeenAt stays untouched
-              lastSeenAt: sql`now()`,
-            },
-          });
-
-        upserted += rows.length;
-      }
-
-      return { upserted };
-    });
+    }
 
     return {
-      jobId: job.id,
-      itemsFound: fetchResult.itemsFound,
-      itemsNew: persistResult.upserted,
+      sourceId: sourceId ?? null,
+      platform: crawlerKey,
+      itemsFound: result.itemsFound,
+      saved: result.saved,
+      error: result.error,
     };
   },
 );
