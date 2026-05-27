@@ -14,7 +14,11 @@
 // All conversion assumptions live here so they can be tuned in one place as
 // real data accrues.
 
-export type RevenueBasis = "sales-derived" | "favorites-proxy" | "ratings-proxy";
+export type RevenueBasis =
+  | "sales-derived"
+  | "sales-amortized"
+  | "favorites-proxy"
+  | "ratings-proxy";
 
 export interface MonthlyEstimate {
   sales: { low: number; high: number };
@@ -56,6 +60,33 @@ export function estimateFromSales(input: {
     sales: { low, high },
     revenue: { low: low * price, high: high * price },
     basis: "sales-derived",
+  };
+}
+
+/**
+ * Strategy A′ — REAL lifetime sales but NO publish date. Gumroad's "X sales"
+ * badge exposes a lifetime total but not a start date, so we can't compute a
+ * true monthly rate the way estimateFromSales does. Instead we amortize the
+ * lifetime total over an assumed window (default 12 months). Tagged
+ * "sales-amortized" so it's honestly distinguished from date-anchored
+ * "sales-derived" — but it's still backed by a real sales count, so the
+ * products workbook treats it as real (not a proxy guess). Same 60% low band
+ * as estimateFromSales.
+ */
+export function estimateFromSalesAmortized(input: {
+  totalSales: number;
+  priceUsd: number;
+  windowMonths?: number;
+}): MonthlyEstimate {
+  const months = Math.max(1, input.windowMonths ?? 12);
+  const perMonth = Math.max(0, input.totalSales) / months;
+  const high = Math.round(perMonth);
+  const low = Math.round(perMonth * 0.6);
+  const price = Math.max(0, input.priceUsd);
+  return {
+    sales: { low, high },
+    revenue: { low: low * price, high: high * price },
+    basis: "sales-amortized",
   };
 }
 

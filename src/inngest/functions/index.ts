@@ -12,13 +12,14 @@ import { crawlHackerNews } from "./crawl-hacker-news";
 import { crawlEnvato } from "./crawl-envato";
 import { crawlKaggle } from "./crawl-kaggle";
 import { crawlEtsy } from "./crawl-etsy";
+import { crawlGumroad } from "./crawl-gumroad";
 import { deepDiveCreator } from "./deep-dive-creator";
 
-// NOTE: crawlGumroad is intentionally NOT registered — Gumroad has no usable
-// official discovery API and would only work via ToS-violating scraping, which
-// we deliberately don't do. crawlEtsy IS registered: it runs through a licensed
-// Apify actor (not raw scraping), so it's on the same footing as the other
-// crawlers. Its file can stay dormant only if removed from this array.
+// NOTE: crawlGumroad now runs through a licensed Apify actor (same footing as
+// crawlEtsy) instead of the old direct gumroad.com/discover_search scrape, so
+// it is registered below. It needs APIFY_TOKEN set; the actor is overridable
+// via GUMROAD_APIFY_ACTOR. crawlEtsy likewise runs through an Apify actor (not
+// raw scraping). A crawler file only stays dormant if removed from this array.
 
 export const allFunctions = [
   crawlSource,
@@ -36,5 +37,6 @@ export const allFunctions = [
   crawlEnvato,
   crawlKaggle,
   crawlEtsy,
+  crawlGumroad,
   deepDiveCreator,
 ];

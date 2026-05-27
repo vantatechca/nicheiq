@@ -67,6 +67,17 @@ describe("aggregateByNicheWithBasis", () => {
     ];
     expect(aggregateByNicheWithBasis(rows)[0]!.niche).toBe("a");
   });
+
+  it("counts sales-amortized (Gumroad real-sales) as real, not proxy", () => {
+    const rows = [
+      mockRow({ niche: "notion_template", revenue: 2000, basis: "sales-amortized" }),
+      mockRow({ niche: "notion_template", revenue: 9000, basis: "ratings-proxy" }),
+    ];
+    const n = aggregateByNicheWithBasis(rows)[0]!;
+    expect(n.realCount).toBe(1); // the sales-amortized row
+    expect(n.salesDerivedRevenue).toBe(2000); // proxy revenue excluded
+    expect(n.totalRevenue).toBe(11000);
+  });
 });
 
 describe("buildProductWorkbook", () => {

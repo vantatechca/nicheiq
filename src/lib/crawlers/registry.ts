@@ -14,10 +14,10 @@ export const CRAWLERS: Partial<Record<string, CrawlerModule>> = {
   hacker_news: hackerNews.default,
   kaggle: kaggle.default,
   etsy: etsy.default,
-  // gumroad: hits an unofficial endpoint with no discovery API — ToS-sensitive.
-  // Left disabled to match the Inngest index note. Re-enable only with that risk
-  // accepted. (See the earlier punch-list, item 2.)
-  // gumroad: gumroad.default,
+  // gumroad now routes through a licensed Apify actor (run-sync-get-dataset-items),
+  // same as etsy — not the old direct gumroad.com/discover_search scrape. Safe to
+  // enable. Requires APIFY_TOKEN; actor overridable via GUMROAD_APIFY_ACTOR.
+  gumroad: gumroad.default,
 };
 
 export function getCrawler(platform: string): CrawlerModule | null {

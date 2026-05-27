@@ -8,10 +8,10 @@ import { PALETTE, thinBorder, titleCase, tierColor } from "./workbook-style";
  *   • All Products   — every real product, ranked by LAST SEEN (freshest first)
  *   • By Niche       — scoreboard splitting sales-derived revenue from total
  *
- * Basis-aware: only "sales-derived" figures (Envato's real lifetime-sales
- * estimates) are treated as proven. Proxy estimates (Etsy favourites, etc.)
- * still appear, but are visually muted and excluded from the proven-winners
- * sheet and the sales-derived revenue column.
+ * Basis-aware: figures backed by a real sales count ("sales-derived" from
+ * Envato, "sales-amortized" from Gumroad) are treated as proven. Proxy
+ * estimates (Etsy favourites, Gumroad ratings) still appear, but are visually
+ * muted and excluded from the proven-winners sheet and the real-revenue column.
  *
  * Pure: takes already-fetched rows, returns an .xlsx buffer. No DB, no auth.
  */
@@ -44,9 +44,12 @@ interface NicheBreakdown {
   totalRevenue: number; // sum of all revenue (incl. proxy)
 }
 
-// The one basis we treat as hard evidence. Matches the `rev:sales-derived` tag
-// the Envato crawler stamps via revenueBasisTag().
-const REAL_BASIS = "sales-derived";
+// The bases we treat as hard evidence: both rest on a REAL sales count.
+//   • sales-derived   — Envato: true lifetime sales ÷ a real publish date.
+//   • sales-amortized — Gumroad: real lifetime sales, no date, amortized over
+//                       an assumed window. Less precise, but still real demand.
+// Proxy bases (favourites / ratings) are NOT counted as real.
+const REAL_BASES = new Set(["sales-derived", "sales-amortized"]);
 
 // A "very high success" product floors at $2k/mo estimated revenue — same bar
 // as the products "Export winners" preset.
@@ -127,7 +130,7 @@ function addProductSheet(
     // Only REAL (sales-derived) revenue gets the bold green/amber confidence
     // tiering. Proxy estimates render muted so the eye trusts the coloured
     // numbers and treats the rest as soft.
-    const isReal = r.basis === REAL_BASIS;
+    const isReal = REAL_BASES.has(r.basis);
     rev.font = isReal
       ? { bold: true, color: { argb: tierColor(r.revenue ?? 0, REV_GREEN_AT, REV_AMBER_AT) } }
       : { italic: true, color: { argb: SUBTITLE_ARGB } };
@@ -289,7 +292,7 @@ export function aggregateByNicheWithBasis(rows: ProductRow[]): NicheBreakdown[] 
     const rev = r.revenue ?? 0;
     m.count += 1;
     m.totalRevenue += rev;
-    if (r.basis === REAL_BASIS) {
+    if (REAL_BASES.has(r.basis)) {
       m.realCount += 1;
       m.salesDerivedRevenue += rev;
     }
