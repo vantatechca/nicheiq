@@ -1,4 +1,10 @@
 import type { CrawlerModule, RawSignal } from "./types";
+import {
+  estimateFromProxy,
+  PROXY_CONVERSION,
+  revenueBasisTag,
+  type MonthlyEstimate,
+} from "./revenue";
 
 const APIFY_BASE = "https://api.apify.com/v2";
 const ACTOR_ID   = "automation-lab~etsy-scraper";
@@ -16,11 +22,17 @@ const DEFAULT_KEYWORDS = [
   "excel template",
 ];
 
-// Output shape from automation-lab~etsy-scraper
+// Output shape from automation-lab~etsy-scraper.
+// title/productUrl/listingUrl and the volume fields (favorites/reviews/etc.) are
+// declared as optional alternates because the actor has used different key names
+// across versions — having them on the type lets normalize() fall back cleanly.
 interface ApifyEtsyItem {
   listingId?:     string | number;
   name?:          string;
+  title?:         string;
   url?:           string;
+  productUrl?:    string;
+  listingUrl?:    string;
   price?:         string | number;
   originalPrice?: string | null;
   currency?:      string;
@@ -28,6 +40,13 @@ interface ApifyEtsyItem {
   shop?:          string;
   shopId?:        string;
   rating?:        number | null;
+  // Volume proxies (names vary by actor version). Used to estimate revenue.
+  favorites?:     number | string | null;
+  numFavorers?:   number | string | null;
+  reviews?:       number | string | null;
+  reviewsCount?:  number | string | null;
+  numReviews?:    number | string | null;
+  ratingCount?:   number | string | null;
   onSale?:        boolean;
   freeShipping?:  boolean;
   availability?:  string;
@@ -48,6 +67,13 @@ function parsePrice(raw: string | number | undefined): number | undefined {
   return isNaN(n) ? undefined : n;
 }
 
+/** Coerce a number-or-string-with-commas field to a clean integer. */
+function num(v: number | string | null | undefined): number | undefined {
+  if (v == null) return undefined;
+  const n = typeof v === "number" ? v : parseInt(String(v).replace(/[^0-9]/g, ""), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 const etsy: CrawlerModule = {
   source: "etsy",
   requiresHeadless: false,
@@ -59,14 +85,20 @@ const etsy: CrawlerModule = {
     const keywords = (config.keywords as string[] | undefined) ?? DEFAULT_KEYWORDS;
     const limit    = (config.limit   as number | undefined)    ?? 50;
 
+    // Category is OPTIONAL and unset by default. The previous build hardcoded
+    // "craft-supplies-and-tools", which silently excluded digital downloads —
+    // the exact products we want (templates, printables, presets). Leave it
+    // unset to search all of Etsy, or pass config.category to scope a run.
+    const category = config.category as string | undefined;
+
     const pages = await Promise.all(
       keywords.map(async (kw): Promise<EtsyPage> => {
-        const input = {
+        const input: Record<string, unknown> = {
           searchQuery: kw,
           maxItems:    Math.min(limit, 100),
           sort:        "most_relevant",
-          category:    "craft-supplies-and-tools",
         };
+        if (category) input.category = category;
 
         const url =
           `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items` +
@@ -109,24 +141,63 @@ const etsy: CrawlerModule = {
     for (const item of parsed) {
       const r = item as ApifyEtsyItem & { _keyword: string };
 
-      const listingIdMatch = r.url?.match(/\/listing\/(\d+)/);
+      // Field-name resilience: the actor has labelled title/url differently
+      // across versions. Fall back across the known variants before skipping.
+      const title = r.name ?? r.title;
+      const link  = r.url ?? r.productUrl ?? r.listingUrl;
+
+      const listingIdMatch = link?.match(/\/listing\/(\d+)/);
       const sourceId =
         r.listingId != null ? String(r.listingId) :
-        listingIdMatch?.[1]  ?? r.url;
+        listingIdMatch?.[1]  ?? link;
 
-      if (!sourceId || !r.url || !r.name) continue;
+      if (!sourceId || !link || !title) continue;
       if (seen.has(sourceId)) continue;
       seen.add(sourceId);
+
+      const price = parsePrice(r.price);
+
+      // Revenue estimate from a demand proxy (Etsy exposes no sales count):
+      //   • favourites — preferred; PROXY_CONVERSION.favorites was written for it.
+      //   • review count — fallback; like Gumroad ratings, a lower bound on buyers.
+      // No proxy present → no estimate (don't fabricate a number).
+      const favourites = num(r.favorites) ?? num(r.numFavorers);
+      const reviewCount =
+        num(r.reviews) ?? num(r.reviewsCount) ?? num(r.numReviews) ?? num(r.ratingCount);
+
+      let est: MonthlyEstimate | undefined;
+      if (favourites != null) {
+        est = estimateFromProxy({
+          proxyCount: favourites,
+          priceUsd: price ?? 0,
+          basis: "favorites-proxy",
+          conversion: PROXY_CONVERSION.favorites,
+        });
+      } else if (reviewCount != null) {
+        est = estimateFromProxy({
+          proxyCount: reviewCount,
+          priceUsd: price ?? 0,
+          basis: "ratings-proxy",
+          conversion: PROXY_CONVERSION.ratings,
+        });
+      }
 
       signals.push({
         sourcePlatform: "etsy",
         sourceId,
-        sourceUrl:    r.url,
-        title:        r.name,
-        priceUsd:     parsePrice(r.price),
+        sourceUrl:    link,
+        title,
+        priceUsd:     price,
         ratingAvg:    r.rating != null ? Number(r.rating) : undefined,
+        ratingCount:  reviewCount,
+        estMonthlySales:   est?.sales,
+        estMonthlyRevenue: est?.revenue,
         capturedAt:   r.scrapedAt ?? new Date().toISOString(),
-        tags: [r._keyword, "digital-download"].filter((x): x is string => Boolean(x)),
+        tags: [
+          r._keyword,
+          "digital-download",
+          est ? revenueBasisTag(est.basis) : undefined,
+        ].filter((x): x is string => Boolean(x)),
         thumbnailUrl: r.imageUrl ?? undefined,
         creator:      r.shop ? { handle: r.shop, profileUrl: "" } : undefined,
         rawJson:      r as unknown as Record<string, unknown>,

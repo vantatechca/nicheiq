@@ -315,7 +315,7 @@ export function aggregateByNicheWithBasis(rows: ProductRow[]): NicheBreakdown[] 
 export async function buildProductWorkbook(allRows: ProductRow[]): Promise<ArrayBuffer> {
   const byRevenue = [...allRows].sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0));
   const topRows = byRevenue
-    .filter((r) => r.basis === REAL_BASIS && (r.revenue ?? 0) >= CANDIDATE_FLOOR)
+    .filter((r) => (r.revenue ?? 0) >= CANDIDATE_FLOOR)
     .slice(0, TOP_N);
   const byLastSeen = [...allRows].sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime());
   const byNiche = aggregateByNicheWithBasis(allRows);
@@ -327,7 +327,7 @@ export async function buildProductWorkbook(allRows: ProductRow[]): Promise<Array
   addProductSheet(
     wb,
     "Top Candidates",
-    `Top ${topRows.length} PROVEN winners — real sales data only (≥ $${CANDIDATE_FLOOR.toLocaleString()}/mo), of ${allRows.length} live products. Sorted by est. revenue.`,
+    `Top ${topRows.length} winners (≥ $${CANDIDATE_FLOOR.toLocaleString()}/mo est.) of ${allRows.length} live products, by revenue. Sales-derived shown bold; proxy estimates muted — see the Basis column.`,
     topRows,
     true,
   );

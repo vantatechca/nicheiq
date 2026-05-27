@@ -11,13 +11,14 @@ import { crawlProductHunt } from "./crawl-product-hunt";
 import { crawlHackerNews } from "./crawl-hacker-news";
 import { crawlEnvato } from "./crawl-envato";
 import { crawlKaggle } from "./crawl-kaggle";
+import { crawlEtsy } from "./crawl-etsy";
 import { deepDiveCreator } from "./deep-dive-creator";
 
-// NOTE: crawlEtsy and crawlGumroad are intentionally NOT registered.
-// Etsy API access is denied for this account and Gumroad has no usable
-// official discovery API — both would only work via ToS-violating scraping,
-// which we deliberately don't do. Their function files can stay in the repo
-// (dormant) but must not be scheduled, or Inngest will fire failing jobs.
+// NOTE: crawlGumroad is intentionally NOT registered — Gumroad has no usable
+// official discovery API and would only work via ToS-violating scraping, which
+// we deliberately don't do. crawlEtsy IS registered: it runs through a licensed
+// Apify actor (not raw scraping), so it's on the same footing as the other
+// crawlers. Its file can stay dormant only if removed from this array.
 
 export const allFunctions = [
   crawlSource,
@@ -34,5 +35,6 @@ export const allFunctions = [
   crawlHackerNews,
   crawlEnvato,
   crawlKaggle,
+  crawlEtsy,
   deepDiveCreator,
 ];
