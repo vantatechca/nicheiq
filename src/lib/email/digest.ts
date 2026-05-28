@@ -7,7 +7,7 @@
  *
  * Env:
  *   RESEND_API_KEY      required to actually send
- *   DIGEST_EMAIL_TO     comma-separated recipients (default: vantatechca@gmail.com)
+ *   DIGEST_EMAIL_TO     comma-separated recipients — REQUIRED to send (no default)
  *   DIGEST_EMAIL_FROM   from address (default: "NicheIQ <onboarding@resend.dev>")
  *   NEXTAUTH_URL        used to build the dashboard CTA link
  */
@@ -175,12 +175,22 @@ export async function sendDigestEmail(input: DigestEmailInput): Promise<SendDige
     return { sent: false, to: [], skipped: "no_api_key" };
   }
 
-  const recipients = (process.env.DIGEST_EMAIL_TO ?? "vantatechca@gmail.com")
+  // DIGEST_EMAIL_TO is required to send. Previously this defaulted to the
+  // project owner's personal Gmail — a real prod footgun: any deploy that
+  // forgot to set the env var silently shipped digests to a personal inbox
+  // (and a teammate or contractor wouldn't know it was happening). Now the
+  // function fails closed when the env is missing, same as the API key
+  // branch above. Set DIGEST_EMAIL_TO in Render's dashboard (comma-separated
+  // for multiple recipients) to opt in.
+  const rawTo = process.env.DIGEST_EMAIL_TO ?? "";
+  const recipients = rawTo
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   if (!recipients.length) {
-    console.warn("[digest-email] DIGEST_EMAIL_TO produced no recipients — skipping");
+    console.warn(
+      "[digest-email] DIGEST_EMAIL_TO is not set — skipping send. Set it in env to enable digests.",
+    );
     return { sent: false, to: [], skipped: "no_recipients" };
   }
 
