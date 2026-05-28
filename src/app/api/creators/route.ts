@@ -34,13 +34,28 @@ export async function GET(req: NextRequest) {
     if (textMatch) conditions.push(textMatch);
   }
 
-  // Keyset on total revenue desc (top earners first).
-  // Cursor format: "<totalRevenue>:<handle>" (handle is the tiebreaker since
-  // there's no single id column visible; if there is one, swap it in).
+  // Keyset cursor with id tiebreaker. Format: "<totalEstRevenueUsd>:<id>".
+  //
+  // Previously this only filtered on totalEstRevenueUsd via `lt(col, value)`.
+  // That's unstable: any creators tied at the cursor's revenue sit exactly on
+  // the page boundary and either get duplicated (appear at the end of page N
+  // and again at the start of page N+1) or skipped (filtered out by `lt`
+  // while their twins on the same revenue weren't). Many creators share
+  // revenue=0, so this misfired often.
+  //
+  // The correct predicate is "row is strictly less in the sort dimension OR
+  // same sort value with strictly lower id". Paired with the existing
+  // ORDER BY (totalEstRevenueUsd desc, id desc) every row lands on exactly
+  // one page.
   if (cursor) {
-    const [cursorValue, cursorTie] = cursor.split(":");
-    if (cursorValue && cursorTie) {
-      conditions.push(lt(creators.totalEstRevenueUsd, Number(cursorValue)));
+    const [rawValue, cursorId] = cursor.split(":");
+    if (rawValue && cursorId) {
+      const cursorValue = Number(rawValue);
+      const keyset = or(
+        lt(creators.totalEstRevenueUsd, cursorValue),
+        and(eq(creators.totalEstRevenueUsd, cursorValue), lt(creators.id, cursorId)),
+      );
+      if (keyset) conditions.push(keyset);
     }
   }
 

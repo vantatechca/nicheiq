@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { signals } from "@/lib/db/schema";
 import { mockSignals } from "@/mock/data";
@@ -19,13 +19,22 @@ export interface ListSignalsResult<T> {
 }
 
 /**
- * List signals for the feed, newest first. Cursor is an offset string
- * (matches the protocol the client already speaks via offsetPaginate).
+ * List signals for the feed, newest first.
  *
- * Mock mode filters the in-memory array; live mode runs a Drizzle query
- * with the same predicates and offset+limit pagination. Returns `total`
- * only in mock mode — for the DB path, total would require a separate
- * COUNT and isn't worth the extra round-trip for a feed view.
+ * Mock mode keeps its original offset-string cursor (e.g. "25", "50") since
+ * it paginates over an in-memory array — offset is cheap there.
+ *
+ * Live mode now uses KEYSET pagination on (processedAt desc, id desc). The
+ * previous live implementation used `.offset(offset).limit(limit+1)`, which
+ * api/response.ts explicitly warns against: offset scales linearly with the
+ * page number (Postgres must read+discard `offset` rows every page) and can
+ * skip or duplicate rows under concurrent inserts (the dominant write
+ * pattern here — crawlers persist signals on cron).
+ *
+ * The two cursor formats don't collide because they only travel round-trip
+ * within one mode (mock cursors only come from mock pages and vice versa).
+ * A keyset cursor starts with epoch ms (a long integer), so the live parser
+ * rejects offset-style cursors cleanly via Number.isFinite.
  */
 export async function listSignals(opts: ListSignalsOpts) {
   const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
@@ -54,17 +63,43 @@ export async function listSignals(opts: ListSignalsOpts) {
     );
   if (opts.minScore) conditions.push(gte(signals.score, opts.minScore));
 
-  const offset = opts.cursor ? Math.max(0, parseInt(opts.cursor, 10) || 0) : 0;
+  // Keyset cursor on (processedAt desc, id desc). Format: "<processedAtMs>:<id>".
+  // The id tiebreaker matters: a single crawler batch persists many signals
+  // sharing one processedAt timestamp, so without it the page boundary would
+  // silently drop or duplicate signals from that batch.
+  if (opts.cursor) {
+    const [rawMs, cursorId] = opts.cursor.split(":");
+    if (rawMs && cursorId) {
+      const cursorMs = Number(rawMs);
+      if (Number.isFinite(cursorMs)) {
+        const cursorTs = new Date(cursorMs);
+        const keyset = or(
+          lt(signals.processedAt, cursorTs),
+          and(eq(signals.processedAt, cursorTs), lt(signals.id, cursorId)),
+        );
+        if (keyset) conditions.push(keyset);
+      }
+    }
+  }
+
   const rows = await db
     .select()
     .from(signals)
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(signals.processedAt))
-    .offset(offset)
+    .orderBy(desc(signals.processedAt), desc(signals.id))
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? String(offset + items.length) : null;
+
+  let nextCursor: string | null = null;
+  if (hasMore && items.length > 0) {
+    const last = items[items.length - 1]!;
+    nextCursor = `${last.processedAt.getTime()}:${last.id}`;
+  }
+
+  // total stays null in live mode — counting separately is a wasted round-trip
+  // for a feed view, and the keyset cursor already tells the UI whether more
+  // pages exist via nextCursor.
   return { items, nextCursor, total: null };
 }

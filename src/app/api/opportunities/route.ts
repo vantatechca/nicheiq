@@ -49,22 +49,49 @@ export async function GET(req: NextRequest) {
     if (textMatch) conditions.push(textMatch);
   }
 
-  // Keyset cursor pagination. Cursor encodes the last seen sort-key value.
-  // This works with real DB pagination (unlike offset, which doesn't scale).
-  // Format: "<sortValue>:<id>" — id is the tie-breaker for stable ordering.
+  // Keyset cursor pagination. Cursor encodes the last seen (sortValue, id).
+  // Format: "<sortValue>:<id>".
+  //
+  // Previously each branch only filtered with `lt(sortCol, cursorValue)`,
+  // ignoring the id half of the cursor. That's unstable: rows tied at the
+  // cursor's sort value sit exactly on the page boundary and either
+  // duplicate (appear at the end of page N and again at the start of N+1)
+  // or get skipped. Score and revenue routinely collide (lots of opps at
+  // score=50/75/100 and at projectedRevenueUsd=1000), so this misfired
+  // every time you paged through the list.
+  //
+  // The correct predicate is "row is strictly less in the sort dimension OR
+  // same sort value with strictly lower id", which pairs with each branch's
+  // existing `ORDER BY sortCol desc, id desc` to land every row on exactly
+  // one page.
   if (q.cursor) {
     const [cursorValue, cursorId] = q.cursor.split(":");
     if (cursorValue && cursorId) {
+      let keyset: SQL | undefined;
       if (q.sort === "newest") {
-        // Sorting DESC by createdAt: cursor row is (createdAt, id);
-        // next page is rows with createdAt < cursor.createdAt
-        conditions.push(lt(opportunities.createdAt, new Date(cursorValue)));
+        const cursorDate = new Date(cursorValue);
+        keyset = or(
+          lt(opportunities.createdAt, cursorDate),
+          and(eq(opportunities.createdAt, cursorDate), lt(opportunities.id, cursorId)),
+        );
       } else if (q.sort === "revenue") {
-        conditions.push(lt(opportunities.projectedRevenueUsd, Number(cursorValue)));
+        const cursorRev = Number(cursorValue);
+        keyset = or(
+          lt(opportunities.projectedRevenueUsd, cursorRev),
+          and(
+            eq(opportunities.projectedRevenueUsd, cursorRev),
+            lt(opportunities.id, cursorId),
+          ),
+        );
       } else {
         // default: score desc
-        conditions.push(lt(opportunities.score, Number(cursorValue)));
+        const cursorScore = Number(cursorValue);
+        keyset = or(
+          lt(opportunities.score, cursorScore),
+          and(eq(opportunities.score, cursorScore), lt(opportunities.id, cursorId)),
+        );
       }
+      if (keyset) conditions.push(keyset);
     }
   }
 

@@ -1,7 +1,5 @@
-import { not, sql } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NextRequest } from "next/server";
-import { and, desc, eq, ilike, isNotNull, isNull, lt, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, isNull, lt, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { products } from "@/lib/db/schema";
 import { ok, unauthorized } from "@/lib/api/response";
@@ -63,12 +61,27 @@ export async function GET(req: NextRequest) {
     );
   if (q) conditions.push(ilike(products.title, `%${q}%`));
 
-  // Keyset pagination on est_monthly_revenue_high desc (highest earners first).
-  // Cursor format: "<revenueHigh>:<id>"
+  // Keyset cursor with id tiebreaker. Format: "<revenueHigh>:<id>".
+  //
+  // Previously this only filtered on estMonthlyRevenueHigh via `lt(col, val)`,
+  // which is unstable: products tied at the cursor's revenue sit exactly on
+  // the page boundary and either duplicate (end of page N + start of page N+1)
+  // or get skipped. Crawled rows routinely share revenue estimates (rev:0,
+  // ratings-proxy clusters), so this misfired often.
+  //
+  // The correct predicate is "row is strictly less in the sort dimension OR
+  // same sort value with strictly lower id". Paired with the existing
+  // ORDER BY (estMonthlyRevenueHigh desc, id desc) every row lands on
+  // exactly one page.
   if (cursor) {
-    const [cursorValue, cursorId] = cursor.split(":");
-    if (cursorValue && cursorId) {
-      conditions.push(lt(products.estMonthlyRevenueHigh, Number(cursorValue)));
+    const [rawValue, cursorId] = cursor.split(":");
+    if (rawValue && cursorId) {
+      const cursorValue = Number(rawValue);
+      const keyset = or(
+        lt(products.estMonthlyRevenueHigh, cursorValue),
+        and(eq(products.estMonthlyRevenueHigh, cursorValue), lt(products.id, cursorId)),
+      );
+      if (keyset) conditions.push(keyset);
     }
   }
 
