@@ -350,6 +350,32 @@ function capCents() {
   return Math.round(Number(process.env.AI_DAILY_SPEND_CAP ?? 5) * 100);
 }
 
+// Atomic reserve-or-deny in a single round-trip. Previously this did two
+// separate Redis commands: INCRBY +estimate, then conditionally INCRBY
+// -estimate to roll back if we'd gone over cap. Between those two commands
+// another concurrent request could observe the inflated total and either
+// falsely deny itself or, under burst load, let multiple requests slip
+// through above the cap before the rollbacks settled.
+//
+// The Lua script below runs server-side as a single atomic operation:
+//   GET current → compare current+estimate vs cap → SET only if under cap.
+// No window for a concurrent call to see an inflated transient state.
+//
+// The EXPIRE is set inside the script too, so a fresh key always picks up
+// the 26h TTL on its first successful reservation.
+const RESERVE_LUA = `
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local estimate = tonumber(ARGV[1])
+local cap = tonumber(ARGV[2])
+local newTotal = current + estimate
+if newTotal > cap then
+  return {0, current, cap}
+end
+redis.call('SET', KEYS[1], newTotal)
+redis.call('EXPIRE', KEYS[1], 93600)
+return {1, newTotal, cap}
+`;
+
 export async function reserveSpend(estimateUsd: number): Promise<{
   allowed: boolean;
   spentCents: number;
@@ -360,14 +386,20 @@ export async function reserveSpend(estimateUsd: number): Promise<{
 
   const estimateCents = Math.max(0, Math.round(estimateUsd * 100));
   const key = spendKey();
-  const newTotal = await redis.incrby(key, estimateCents);
-  await redis.expire(key, 60 * 60 * 26);
 
-  if (newTotal > cap) {
-    await redis.incrby(key, -estimateCents);
-    return { allowed: false, spentCents: newTotal - estimateCents, capCents: cap };
-  }
-  return { allowed: true, spentCents: newTotal, capCents: cap };
+  // Returns [allowedFlag, totalAfterCall, capUsedByScript].
+  // allowedFlag: 1 = reserved, 0 = denied (over cap).
+  // totalAfterCall: post-script total in cents. On deny this is the pre-call
+  // value (untouched); on allow it's the new running total.
+  const result = (await redis.eval(RESERVE_LUA, [key], [estimateCents, cap])) as [
+    number,
+    number,
+    number,
+  ];
+  const allowed = result[0] === 1;
+  const newTotal = result[1];
+
+  return { allowed, spentCents: newTotal, capCents: cap };
 }
 
 export async function recordActualSpend(estimateUsd: number, actualUsd: number) {
@@ -375,6 +407,9 @@ export async function recordActualSpend(estimateUsd: number, actualUsd: number) 
   const deltaCents = Math.round((actualUsd - estimateUsd) * 100);
   if (deltaCents === 0) return;
   const key = spendKey();
+  // Reconciliation is fine as plain INCRBY — a single atomic command, and a
+  // small over- or under-shoot across the day is acceptable (the cap is a
+  // soft fence around heavy days, not an accountant's ledger).
   await redis.incrby(key, deltaCents);
   await redis.expire(key, 60 * 60 * 26);
 }
