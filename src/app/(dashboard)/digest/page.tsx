@@ -28,15 +28,30 @@ interface Digest {
 export default function DigestPage() {
   const [generating, setGenerating] = useState(false);
 
-  const { data: dailyData, loading: dailyLoading } = useApi<{ digests: Digest[] }>(
-    "/api/digest?cadence=daily",
-  );
-  const { data: weeklyData, loading: weeklyLoading } = useApi<{ digests: Digest[] }>(
-    "/api/digest?cadence=weekly",
-  );
+  // refetch lets us re-pull the daily/weekly lists after generating or
+  // resending a digest. The previous build did `window.location.reload()`,
+  // which threw away every bit of client state (scroll position, open tab,
+  // sonner toasts) and reloaded all assets — a full SPA nuke for what is
+  // really a 1-row data refresh.
+  const {
+    data: dailyData,
+    loading: dailyLoading,
+    refetch: refetchDaily,
+  } = useApi<{ digests: Digest[] }>("/api/digest?cadence=daily");
+  const {
+    data: weeklyData,
+    loading: weeklyLoading,
+    refetch: refetchWeekly,
+  } = useApi<{ digests: Digest[] }>("/api/digest?cadence=weekly");
 
   const daily = dailyData?.digests ?? [];
   const weekly = weeklyData?.digests ?? [];
+
+  // Pull both tabs in parallel — the new digest might be either cadence,
+  // and the user could be looking at the wrong tab when it arrives.
+  const refreshAll = async () => {
+    await Promise.all([refetchDaily(), refetchWeekly()]);
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -44,7 +59,7 @@ export default function DigestPage() {
       const res = await fetch("/api/digest", { method: "POST" });
       if (!res.ok) throw new Error("Failed");
       toast.success("Digest generated!");
-      window.location.reload();
+      await refreshAll();
     } catch {
       toast.error("Failed to generate digest");
     } finally {
@@ -76,7 +91,7 @@ export default function DigestPage() {
             <div className="text-xs text-slate-500">No daily digests yet.</div>
           )}
           {daily.map((d) => (
-            <DigestCard key={d.id} digest={d} />
+            <DigestCard key={d.id} digest={d} onRefresh={refreshAll} />
           ))}
         </TabsContent>
         <TabsContent value="weekly" className="grid gap-3 lg:grid-cols-2">
@@ -85,7 +100,7 @@ export default function DigestPage() {
             <div className="text-xs text-slate-500">No weekly digests yet.</div>
           )}
           {weekly.map((d) => (
-            <DigestCard key={d.id} digest={d} />
+            <DigestCard key={d.id} digest={d} onRefresh={refreshAll} />
           ))}
         </TabsContent>
       </Tabs>
@@ -93,7 +108,7 @@ export default function DigestPage() {
   );
 }
 
-function DigestCard({ digest }: { digest: Digest }) {
+function DigestCard({ digest, onRefresh }: { digest: Digest; onRefresh: () => Promise<void> }) {
   const [resending, setResending] = useState(false);
   async function handleResend() {
     setResending(true);
@@ -114,7 +129,9 @@ function DigestCard({ digest }: { digest: Digest }) {
       } else {
         toast.success("Digest rebuilt");
       }
-      setTimeout(() => window.location.reload(), 1500);
+      // Re-pull the lists so the new digest row appears at the top without
+      // a full document reload. Fire-and-forget — the toast is already up.
+      void onRefresh();
     } catch (err) {
       toast.error(`Failed to resend: ${(err as Error).message}`);
     } finally {
