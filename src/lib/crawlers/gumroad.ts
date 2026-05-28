@@ -7,6 +7,7 @@ import {
   revenueBasisTag,
   type MonthlyEstimate,
 } from "./revenue";
+import { runApifyActor } from "./apify";
 
 // Gumroad discovery via a licensed Apify actor — NOT direct scraping.
 //
@@ -14,14 +15,14 @@ import {
 // is an unofficial, ToS-sensitive endpoint and breaks the project rule that
 // ToS-sensitive marketplaces go through the proxy layer (Apify / ScrapingBee /
 // Bright Data) — never direct. That's why this crawler sat disabled. We now
-// mirror the Etsy crawler: drive a discovery-oriented Apify actor through
-// run-sync-get-dataset-items, then normalize its output resiliently.
+// mirror the Etsy crawler: drive a discovery-oriented Apify actor through the
+// async run helper (start → poll → fetch dataset → abort on cancel), then
+// normalize its output resiliently.
 //
 // The default actor (overridable via config.actorId or GUMROAD_APIFY_ACTOR)
 // crawls Gumroad search/category pages and returns product listings. If you
 // swap actors and the new one expects a different per-keyword input shape,
 // pass config.inputOverride — it's shallow-merged into each run's input.
-const APIFY_BASE = "https://api.apify.com/v2";
 const DEFAULT_ACTOR_ID = "nifty.codes~gumroad-products-scraper";
 
 // When an actor returns a real lifetime sales count but no publish date (the
@@ -250,29 +251,31 @@ const gumroad: CrawlerModule = {
         ...inputOverride,
       };
 
-      const url =
-        `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items` +
-        `?token=${token}&timeout=120&memory=512`;
-
+      // Async run → poll → fetch dataset, with explicit /abort on any
+      // cancellation. The previous build used run-sync-get-dataset-items
+      // with AbortSignal.timeout(130_000); when that fired, the Apify run
+      // kept executing on Apify's side (we never knew its run ID), so
+      // every client-side timeout silently billed the full actor run.
+      // runApifyActor() exposes the run ID up front and POSTs /abort on
+      // any exit path that isn't a clean SUCCEEDED.
       try {
         console.log(`[gumroad-apify] running actor "${actorId}" for: "${keyword}"`);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
-          signal: AbortSignal.timeout(130_000),
+        const { items, status } = await runApifyActor<ApifyGumroadItem>({
+          actorId,
+          token,
+          input,
+          runTimeoutSecs: 120,
+          memoryMbytes:   512,
+          label:          "gumroad-apify",
         });
 
-        if (!res.ok) {
-          console.warn(`[gumroad-apify] HTTP ${res.status} for "${keyword}"`);
+        if (status !== "SUCCEEDED") {
+          console.warn(`[gumroad-apify] run ${status} for "${keyword}"`);
           pages.push({ keyword, items: [] });
-          await sleep(delayMs);
-          continue;
+        } else {
+          console.log(`[gumroad-apify] got ${items.length} items for "${keyword}"`);
+          pages.push({ keyword, items: Array.isArray(items) ? items : [] });
         }
-
-        const items = (await res.json()) as ApifyGumroadItem[];
-        console.log(`[gumroad-apify] got ${items.length} items for "${keyword}"`);
-        pages.push({ keyword, items: Array.isArray(items) ? items : [] });
       } catch (e) {
         console.warn(`[gumroad-apify] run failed for "${keyword}":`, e);
         pages.push({ keyword, items: [] });

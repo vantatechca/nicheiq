@@ -5,9 +5,9 @@ import {
   revenueBasisTag,
   type MonthlyEstimate,
 } from "./revenue";
+import { runApifyActor } from "./apify";
 
-const APIFY_BASE = "https://api.apify.com/v2";
-const ACTOR_ID   = "automation-lab~etsy-scraper";
+const ACTOR_ID = "automation-lab~etsy-scraper";
 
 const DEFAULT_KEYWORDS = [
   "canva template",
@@ -100,27 +100,37 @@ const etsy: CrawlerModule = {
         };
         if (category) input.category = category;
 
-        const url =
-          `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items` +
-          `?token=${token}&timeout=120&memory=512`;
-
         console.log(`[etsy-apify] running actor for: "${kw}"`);
 
-        const res = await fetch(url, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(input),
-          signal:  AbortSignal.timeout(130_000),
-        });
-
-        if (!res.ok) {
-          console.warn(`[etsy-apify] HTTP ${res.status} for "${kw}"`);
+        // Async run → poll → fetch dataset, with explicit /abort on any
+        // cancellation. The previous build used run-sync-get-dataset-items
+        // with AbortSignal.timeout(130_000); when that fired, the Apify run
+        // kept executing on Apify's side (we never knew its run ID), so
+        // every client-side timeout silently billed the full actor run.
+        // runApifyActor() exposes the run ID up front and POSTs /abort on
+        // any exit path that isn't a clean SUCCEEDED.
+        try {
+          const { items, status } = await runApifyActor<ApifyEtsyItem>({
+            actorId:        ACTOR_ID,
+            token,
+            input,
+            runTimeoutSecs: 120,
+            memoryMbytes:   512,
+            label:          "etsy-apify",
+          });
+          if (status !== "SUCCEEDED") {
+            console.warn(`[etsy-apify] run ${status} for "${kw}"`);
+            return { keyword: kw, items: [] };
+          }
+          console.log(`[etsy-apify] got ${items.length} items for "${kw}"`);
+          return { keyword: kw, items };
+        } catch (e) {
+          // A single failed keyword shouldn't kill the whole batch. Previously
+          // a thrown error here (network/abort) would reject Promise.all and
+          // discard every successful keyword too.
+          console.warn(`[etsy-apify] run failed for "${kw}":`, e);
           return { keyword: kw, items: [] };
         }
-
-        const items = (await res.json()) as ApifyEtsyItem[];
-        console.log(`[etsy-apify] got ${items.length} items for "${kw}"`);
-        return { keyword: kw, items };
       }),
     );
 
