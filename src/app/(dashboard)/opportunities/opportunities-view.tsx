@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+// Client view for /opportunities. Receives the first SSR slice + an
+// initialNextCursor. Load-more appends pages via /api/opportunities?cursor=…
+// preserving all current filters and sort.
+
+import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { FileSpreadsheet, Filter, Sparkles, Sun, X } from "lucide-react";
@@ -37,9 +41,19 @@ interface Props {
   opportunities: Opportunity[];
   total: number;
   filters: Filters;
+  /** Cursor for the next page beyond the SSR slice; null if there is none. */
+  initialNextCursor: string | null;
+  /** Page size used by the SSR; reused by Load-more for visual consistency. */
+  pageSize: number;
 }
 
-export function OpportunitiesView({ opportunities, total, filters }: Props) {
+export function OpportunitiesView({
+  opportunities,
+  total,
+  filters,
+  initialNextCursor,
+  pageSize,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -47,6 +61,30 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
   const [searchInput, setSearchInput] = useState(filters.search);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, setBulkPending] = useState(false);
+
+  // Pagination state. `extra` holds Load-more pages on top of the SSR slice;
+  // `cursor` is what we'll send next; `loadingMore` disables the button
+  // during fetch. All three reset whenever the SSR `opportunities` prop
+  // identity changes — that's our signal that the user changed a filter and
+  // the server re-rendered with a fresh first page.
+  const [extra, setExtra] = useState<Opportunity[]>([]);
+  const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setExtra([]);
+    setCursor(initialNextCursor);
+    // Reset selection too — selected ids might belong to the OLD filter's
+    // result set and not exist in the new one. Keeping them would cause
+    // confusing "5 selected" with nothing visible to act on.
+    setSelected(new Set());
+  }, [opportunities, initialNextCursor]);
+
+  // Combined render list — SSR slice first, appended pages after.
+  const allOpportunities = useMemo(
+    () => [...opportunities, ...extra],
+    [opportunities, extra],
+  );
 
   const updateFilter = useCallback(
     (patch: Partial<Filters>) => {
@@ -78,6 +116,46 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     startTransition(() => router.replace(pathname, { scroll: false }));
   }
 
+  // Build the API query string for Load-more. Must mirror the SSR filters
+  // exactly or the appended page won't be a logical continuation.
+  // NB: the page URL uses `effort=` but the API expects `buildEffort=` (the
+  // API param name matches the DB column), so this fn does the translation.
+  const buildLoadMoreUrl = useCallback(
+    (forCursor: string) => {
+      const u = new URLSearchParams();
+      u.set("limit", String(pageSize));
+      u.set("cursor", forCursor);
+      u.set("sort", filters.sort);
+      if (filters.niche) u.set("niche", filters.niche);
+      if (filters.type) u.set("type", filters.type);
+      if (filters.effort) u.set("buildEffort", filters.effort);
+      if (filters.status) u.set("status", filters.status);
+      if (filters.minScore > 0) u.set("minScore", String(filters.minScore));
+      if (filters.search.trim()) u.set("q", filters.search.trim());
+      return `/api/opportunities?${u.toString()}`;
+    },
+    [filters, pageSize],
+  );
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(buildLoadMoreUrl(cursor));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // API envelope: { data: { opportunities: Opportunity[] }, meta: { nextCursor } }
+      const json = await res.json();
+      const newItems: Opportunity[] = json?.data?.opportunities ?? [];
+      const newCursor: string | null = json?.meta?.nextCursor ?? null;
+      setExtra((prev) => [...prev, ...newItems]);
+      setCursor(newCursor);
+    } catch (err) {
+      toast.error(`Failed to load more: ${(err as Error).message}`);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   // Build the workbook download URL — carries current filters so the export
   // matches exactly what's on screen.
   const workbookHref = (() => {
@@ -91,7 +169,11 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     return `/api/opportunities/workbook?${u.toString()}`;
   })();
 
-  const allOnPage = opportunities.map((o) => o.id);
+  // "Select all on page" now means "everything currently loaded" — SSR
+  // slice + every Load-more page on top of it. That's what users expect
+  // after scrolling and paginating; the alternative ("just the first 50
+  // even though you can see 150") would be weird.
+  const allOnPage = allOpportunities.map((o) => o.id);
   const allSelected = selected.size > 0 && allOnPage.every((id) => selected.has(id));
 
   function toggleAll() {
@@ -159,11 +241,14 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
     [filters.niche, filters.type, filters.effort, filters.status].filter(Boolean).length +
     (filters.minScore > 0 ? 1 : 0);
 
+  // Live count for the header — grows as Load-more pages append.
+  const shownCount = allOpportunities.length;
+
   return (
     <>
       <PageHeader
         title="Opportunities"
-        description={`${opportunities.length} of ${total} ranked across niches.`}
+        description={`${shownCount} of ${total} ranked across niches.`}
         actions={
           <>
             <SavedViews
@@ -340,7 +425,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           className="h-3 w-3 cursor-pointer"
           aria-label="Select all"
         />
-        Select all on page
+        Select all loaded ({shownCount})
       </div>
 
       <div
@@ -348,7 +433,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           isPending ? "opacity-60 transition-opacity" : ""
         }`}
       >
-        {opportunities.map((o) => {
+        {allOpportunities.map((o) => {
           const isSelected = selected.has(o.id);
           return (
             <Card
@@ -398,7 +483,7 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
             </Card>
           );
         })}
-        {opportunities.length === 0 ? (
+        {allOpportunities.length === 0 ? (
           <div className="col-span-full flex flex-col items-center gap-3 rounded-md border border-dashed border-slate-800 p-12 text-center">
             <p className="text-sm text-slate-400">No opportunities match your filters.</p>
             <div className="flex gap-2">
@@ -410,6 +495,24 @@ export function OpportunitiesView({ opportunities, total, filters }: Props) {
           </div>
         ) : null}
       </div>
+
+      {/*
+        Load more — shown only when the server told us there's a next page.
+        Centered below the grid; spans full width on every breakpoint.
+      */}
+      {cursor ? (
+        <div className="mt-6 flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading…" : `Load ${pageSize} more`}
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }
