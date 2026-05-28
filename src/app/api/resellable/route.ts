@@ -5,6 +5,7 @@ import { resellableAssets } from "@/lib/db/schema";
 import { ok, badRequest, created, unauthorized } from "@/lib/api/response";
 import { resellableSchema } from "@/lib/utils/validation";
 import { requireSession } from "@/lib/auth/session";
+import { excludeSeedsClause, shouldIncludeSeeds } from "@/lib/db/seed-filter";
 
 export async function GET(req: NextRequest) {
   const session = await requireSession();
@@ -14,6 +15,14 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const conditions: SQL[] = [];
+
+  // Hide seeded mock assets by default — matches /products, /opportunities,
+  // /creators, and the competitors-workbook export. Without this, the
+  // resellable page surfaces a mix of real user-added assets (asset_user_…)
+  // and seed rows (asset_1, asset_2, …) with no visual distinction. Opt out
+  // with ?includeSeeds=1 for debugging.
+  conditions.push(...excludeSeedsClause(resellableAssets.id, shouldIncludeSeeds(req.nextUrl)));
+
   if (status)
     conditions.push(
       eq(resellableAssets.status, status as (typeof resellableAssets.status.enumValues)[number]),

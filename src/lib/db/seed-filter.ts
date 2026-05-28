@@ -4,13 +4,14 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 /**
  * Hides rows seeded by `npm run db:seed` from list endpoints, without
  * deleting them. The seeder uses deterministic IDs like `product_1`,
- * `signal_47`, `opportunity_12` — a single regex per entity catches them
- * all. Real data uses different ID shapes:
+ * `signal_47`, `opportunity_12`, `asset_3` — a single regex per entity
+ * catches them all. Real data uses different ID shapes:
  *
  *   - `product_launch_<oppid>_<ts>` for launched products
  *   - `product_from_signal_<id>` for promoted-from-feed products
  *   - `signal_<sourcePlatform>_<external-id>_<ts>` for crawler signals
  *   - `opportunity_user_<ts>_<rand>` for AI-synthesized opportunities
+ *   - `asset_user_<ts>` for user-added resellable assets
  *
  * Why this approach and not the alternatives:
  *
@@ -28,7 +29,10 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
  * conventions keeps drift visible during code review.
  */
 
-const SEED_ID_PATTERN = /^(product|signal|opportunity|creator|trend)_\d+$/;
+// `asset` added to the pattern so /api/resellable can hide mock rows the
+// same way the other list endpoints do. Real assets created via
+// POST /api/resellable use `asset_user_<ts>` and don't match.
+const SEED_ID_PATTERN = /^(product|signal|opportunity|creator|trend|asset)_\d+$/;
 
 /**
  * Build a Drizzle WHERE clause that excludes seed rows by id pattern.
