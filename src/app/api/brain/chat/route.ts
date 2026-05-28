@@ -6,6 +6,7 @@ import type { BrainMode } from "@/lib/ai/context-assembler";
 import { requireSession } from "@/lib/auth/session";
 import { getRateLimiter } from "@/lib/redis/client";
 import { getDb } from "@/lib/db/client";
+import { classifyAnthropicError } from "@/lib/ai/anthropic-errors";
 import { conversations, messages as messagesTable } from "@/lib/db/schema";
 import { selectModel, estimateCostUsd, reserveSpend, recordActualSpend } from "@/lib/ai/client";
 
@@ -148,7 +149,18 @@ async function streamLive(opts: LiveStreamOpts): Promise<ReadableStream<Uint8Arr
         const usage = await usageDone;
         actualUsd = estimateCostUsd(3, usage);
       } catch (err) {
-        controller.enqueue(encoder.encode(`\n\n[stream error: ${(err as Error).message}]`));
+        const classified = classifyAnthropicError(err);
+        // Real error (incl. Anthropic's request_id) goes to OUR logs, never the user.
+        console.error("[brain/chat] AI stream error:", {
+          kind: classified.kind,
+          requestId: classified.requestId,
+          raw: classified.raw,
+        });
+        // Stream a clean line instead of the raw SDK error. The usage-limit cap
+        // rejects before any token, so assistantText is empty and the bubble
+        // shows just this message — mirroring the daily-spend-cap notice above.
+        const prefix = assistantText.length > 0 ? "\n\n" : "";
+        controller.enqueue(encoder.encode(prefix + classified.userMessage));
         try {
           const usage = await usageDone;
           actualUsd = estimateCostUsd(3, usage);
