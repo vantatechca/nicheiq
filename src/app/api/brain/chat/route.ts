@@ -247,7 +247,24 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
-  const userId = (session.user as { id?: string }).id ?? session.user?.email ?? "anon";
+
+  // userId MUST be the real users.id — anything else (email, "anon") will
+  // violate the conversations.user_id FK (-> users.id ON DELETE CASCADE) and
+  // crash the insert with a confusing PG error mid-stream. Earlier code had
+  // `session.user.id ?? session.user.email ?? "anon"`, which silently masked
+  // the real failure mode (a session without id should be rejected, not
+  // patched). With the strict check below, any session that didn't make it
+  // through the JWT callback cleanly gets a clean 401 here.
+  const userId = (session.user as { id?: string }).id;
+  if (!userId) {
+    return new Response(
+      JSON.stringify({
+        error: "Session is missing user id",
+        message: "Please sign out and sign back in.",
+      }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Rate limit: 10/min per user. Returns null when Redis isn't configured.
   const limiter = getRateLimiter({ limit: 10, window: "1 m", key: "brain-chat" });
