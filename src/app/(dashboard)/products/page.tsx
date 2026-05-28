@@ -4,9 +4,18 @@
 import { and, desc, eq, ilike, isNotNull, isNull, lte, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { products } from "@/lib/db/schema";
+import { excludeSeedsClause } from "@/lib/db/seed-filter";
 import { ProductsView } from "./products-view";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Initial page size for SSR. The client uses the same value when paging via
+ * `/api/products?cursor=...` so each Load-more click feels consistent in
+ * height. Keep it small enough that the first paint is fast and the user
+ * doesn't have to scroll for ages before the first "Load more" appears.
+ */
+const PAGE_SIZE = 50;
 
 /**
  * View modes:
@@ -50,6 +59,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
   // one array prevents drift between what the user sees and what the
   // toggle-label counts claim.
   const baseConditions: SQL[] = [];
+
+  // Seed-filter parity with /api/products: if the API hides seeds by
+  // default, the SSR initial page has to as well — otherwise the first 50
+  // could include seed rows and Load-more would silently skip them on
+  // page 2, producing an obvious visual jump. Both layers now agree.
+  baseConditions.push(...excludeSeedsClause(products.id, false));
+
   if (niche)
     baseConditions.push(eq(products.niche, niche as (typeof products.niche.enumValues)[number]));
   if (platform)
@@ -71,13 +87,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
   // Fetch list + three counts in parallel. The counts power the toggle
   // labels — "Mine (1)" / "Market (80)" / "All (81)" — so the user
   // can see which view would have data before clicking it.
+  //
+  // We fetch PAGE_SIZE+1 rows to detect a next page without a separate
+  // COUNT query: if the +1 row exists, build an initialNextCursor from
+  // the last row of the trimmed slice and hand it to the client. Same
+  // pattern the API route uses.
   const [rows, mineCountRow, marketCountRow] = await Promise.all([
     db
       .select()
       .from(products)
       .where(listConditions.length ? and(...listConditions) : undefined)
       .orderBy(desc(products.estMonthlyRevenueHigh), desc(products.id))
-      .limit(200),
+      .limit(PAGE_SIZE + 1),
     db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(products)
@@ -88,16 +109,30 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
       .where(and(...baseConditions, isNull(products.opportunityId))),
   ]);
 
+  const hasMore = rows.length > PAGE_SIZE;
+  const items = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+  let initialNextCursor: string | null = null;
+  if (hasMore && items.length > 0) {
+    const last = items[items.length - 1]!;
+    // Format matches the API route's cursor parser exactly:
+    // "<estMonthlyRevenueHigh>:<id>". Don't change this without also
+    // updating /api/products/route.ts.
+    initialNextCursor = `${last.estMonthlyRevenueHigh ?? 0}:${last.id}`;
+  }
+
   const mineCount = mineCountRow[0]?.count ?? 0;
   const marketCount = marketCountRow[0]?.count ?? 0;
   const total = mineCount + marketCount;
 
   return (
     <ProductsView
-      products={rows as never[]}
+      products={items as never[]}
       total={total}
       counts={{ all: total, mine: mineCount, market: marketCount }}
       filters={{ niche, platform, search, maxPrice, view }}
+      initialNextCursor={initialNextCursor}
+      pageSize={PAGE_SIZE}
     />
   );
 }

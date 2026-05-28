@@ -2,8 +2,14 @@
 
 // Client view for /products. Receives filtered products from server. Updates
 // URL params on filter changes; debounces search input locally.
+//
+// Pagination: the SSR sends the first `pageSize` products plus an
+// `initialNextCursor` if there's more. Clicking "Load more" hits
+// `/api/products?cursor=...` with the SAME filters the server used, appends
+// the response, and updates the cursor. When the server reports no further
+// cursor, the button hides itself.
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +21,7 @@ import { FilterChips } from "@/components/shared/filter-chips";
 import { NICHE_LIST, SOURCE_PLATFORMS } from "@/lib/utils/constants";
 import { formatUsd, formatNumber, formatRange } from "@/lib/utils/format";
 import { FileDown, FileSpreadsheet, Rocket, Star, Trophy, Users } from "lucide-react";
+import { toast } from "sonner";
 import type { Product } from "@/lib/types";
 
 type ViewMode = "mine" | "market" | "all";
@@ -38,14 +45,43 @@ interface Props {
   total: number;
   counts: Counts;
   filters: Filters;
+  /** Cursor for the next page beyond the SSR slice; null if there is none. */
+  initialNextCursor: string | null;
+  /** Page size used by the SSR; reused by Load-more for visual consistency. */
+  pageSize: number;
 }
 
-export function ProductsView({ products, total, counts, filters }: Props) {
+export function ProductsView({
+  products,
+  total,
+  counts,
+  filters,
+  initialNextCursor,
+  pageSize,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
   const [searchInput, setSearchInput] = useState(filters.search);
+
+  // Pagination state. `extra` accumulates Load-more pages on top of the SSR
+  // slice; `cursor` is what we'll send next; `loadingMore` disables the
+  // button during the fetch. We RESET all three whenever the SSR `products`
+  // prop identity changes — that's our signal that the user changed a
+  // filter and the server re-rendered with a fresh first page.
+  const [extra, setExtra] = useState<Product[]>([]);
+  const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setExtra([]);
+    setCursor(initialNextCursor);
+  }, [products, initialNextCursor]);
+
+  // Combined render list — SSR slice first, appended pages after. Memoized so
+  // the grid doesn't recompute its mapping on every parent re-render.
+  const allProducts = useMemo(() => [...products, ...extra], [products, extra]);
 
   const updateFilter = useCallback(
     (patch: Partial<Filters>) => {
@@ -70,6 +106,45 @@ export function ProductsView({ products, total, counts, filters }: Props) {
     const t = setTimeout(() => updateFilter({ search: searchInput }), 300);
     return () => clearTimeout(t);
   }, [searchInput, filters.search, updateFilter]);
+
+  // Build the API query string for Load-more. Must mirror the SSR query
+  // exactly or the appended page won't be a logical continuation of what's
+  // already on screen. NB: the page URL uses `platform=` but the API expects
+  // `sourcePlatform=` — that mismatch is intentional (the API param name
+  // matches the DB column), so this fn does the translation.
+  const buildLoadMoreUrl = useCallback(
+    (forCursor: string) => {
+      const u = new URLSearchParams();
+      u.set("limit", String(pageSize));
+      u.set("cursor", forCursor);
+      if (filters.niche) u.set("niche", filters.niche);
+      if (filters.platform) u.set("sourcePlatform", filters.platform);
+      if (filters.search.trim()) u.set("q", filters.search.trim());
+      if (filters.maxPrice !== 200) u.set("maxPrice", String(filters.maxPrice));
+      if (filters.view !== "all") u.set("view", filters.view);
+      return `/api/products?${u.toString()}`;
+    },
+    [filters, pageSize],
+  );
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(buildLoadMoreUrl(cursor));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // API envelope: { data: { products: Product[] }, meta: { nextCursor } }
+      const json = await res.json();
+      const newItems: Product[] = json?.data?.products ?? [];
+      const newCursor: string | null = json?.meta?.nextCursor ?? null;
+      setExtra((prev) => [...prev, ...newItems]);
+      setCursor(newCursor);
+    } catch (err) {
+      toast.error(`Failed to load more: ${(err as Error).message}`);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Export URLs point at GET /api/export/products. We use a plain <a download>
   // rather than fetch+blob: the route is same-origin, the NextAuth session
@@ -103,16 +178,20 @@ export function ProductsView({ products, total, counts, filters }: Props) {
     startTransition(() => router.replace(pathname, { scroll: false }));
   }
 
+  // For the page-header description we now show the live count (SSR slice +
+  // anything Load-more has appended) so it grows as the user paginates.
+  const shownCount = allProducts.length;
+
   return (
     <>
       <PageHeader
         title="Products"
         description={
           filters.view === "mine"
-            ? `${products.length} of ${counts.mine} products you've launched.`
+            ? `${shownCount} of ${counts.mine} products you've launched.`
             : filters.view === "market"
-              ? `${products.length} of ${counts.market} market products tracked across all sources.`
-              : `${products.length} of ${total} tracked across all sources.`
+              ? `${shownCount} of ${counts.market} market products tracked across all sources.`
+              : `${shownCount} of ${total} tracked across all sources.`
         }
         actions={
           <div className="flex items-center gap-2">
@@ -227,7 +306,7 @@ export function ProductsView({ products, total, counts, filters }: Props) {
           isPending ? "opacity-60 transition-opacity" : ""
         }`}
       >
-        {products.map((p) => {
+        {allProducts.map((p) => {
           // A "launched" product carries an opportunityId tying it back
           // to the planning artefact. Show an emerald badge so the user
           // can spot their own portfolio items even when the All view
@@ -293,7 +372,7 @@ export function ProductsView({ products, total, counts, filters }: Props) {
             </Link>
           );
         })}
-        {products.length === 0 ? (
+        {allProducts.length === 0 ? (
           <div className="col-span-full rounded-md border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
             {filters.view === "mine" ? (
               <>
@@ -311,6 +390,25 @@ export function ProductsView({ products, total, counts, filters }: Props) {
           </div>
         ) : null}
       </div>
+
+      {/*
+        Load more — shown only when the server told us there's a next page.
+        Spans the full grid width on every breakpoint so it sits centered
+        below the cards instead of squeezed into a single column.
+      */}
+      {cursor ? (
+        <div className="mt-6 flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading…" : `Load ${pageSize} more`}
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

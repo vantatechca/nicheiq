@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { and, desc, eq, ilike, isNotNull, isNull, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { products } from "@/lib/db/schema";
 import { ok, unauthorized } from "@/lib/api/response";
@@ -40,6 +40,15 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Math.max(1, Number(sp.get("limit") ?? 25)));
   const cursor = sp.get("cursor") ?? undefined;
 
+  // Mirror the SSR query's price cap so the Load-more cursor stream stays
+  // consistent with what the user already sees. Defaults match the SSR
+  // (5..300 clamp, 200 default).
+  const rawMaxPrice = sp.get("maxPrice");
+  const maxPrice =
+    rawMaxPrice != null
+      ? Math.max(5, Math.min(300, Number(rawMaxPrice) || 200))
+      : null;
+
   const db = getDb();
   const conditions: SQL[] = [];
 
@@ -60,6 +69,11 @@ export async function GET(req: NextRequest) {
       eq(products.sourcePlatform, platform as (typeof products.sourcePlatform.enumValues)[number]),
     );
   if (q) conditions.push(ilike(products.title, `%${q}%`));
+  if (maxPrice != null) {
+    // COALESCE so launched products with null priceUsd aren't filtered out
+    // by accident — matches the SSR query in page.tsx.
+    conditions.push(lte(sql`COALESCE(${products.priceUsd}, 0)`, maxPrice));
+  }
 
   // Keyset cursor with id tiebreaker. Format: "<revenueHigh>:<id>".
   //
