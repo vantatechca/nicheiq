@@ -17,7 +17,7 @@ export function Sidebar() {
   }));
 
   return (
-    <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-950 lg:flex">
+    <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-950 lg:flex sticky top-0">
       <div className="flex h-14 items-center gap-2 border-b border-slate-800 px-4">
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Sparkles className="h-4 w-4" />
