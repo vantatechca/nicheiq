@@ -167,8 +167,8 @@ function BrainView() {
   }
 
   return (
-    <div className="grid h-[calc(100vh-7rem)] gap-3 lg:grid-cols-[260px_1fr]">
-      <Card className="flex flex-col border-slate-800 bg-slate-900/40">
+    <div className="grid h-[calc(100dvh-7rem)] min-h-0 grid-rows-[auto_1fr] gap-3 lg:grid-rows-1 lg:grid-cols-[260px_1fr]">
+      <Card className="flex max-h-[38vh] min-h-0 flex-col border-slate-800 bg-slate-900/40 lg:sticky lg:top-0 lg:max-h-none lg:h-full">
         <div className="flex items-center justify-between border-b border-slate-800 p-3">
           <span className="text-sm font-semibold">Conversations</span>
           <Button
@@ -181,7 +181,7 @@ function BrainView() {
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-1 p-2">
             {conversations.length === 0 ? (
               <div className="rounded-md border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
@@ -269,7 +269,7 @@ function BrainView() {
         </ScrollArea>
       </Card>
 
-      <Card className="flex flex-col overflow-hidden border-slate-800 bg-slate-900/40">
+      <Card className="flex min-h-0 flex-col overflow-hidden border-slate-800 bg-slate-900/40 lg:h-full">
         <div className="flex items-center justify-between border-b border-slate-800 p-3">
           <div className="flex min-w-0 items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -284,7 +284,7 @@ function BrainView() {
           </div>
           <ModePicker value={mode} onChange={setMode} />
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <ChatWindow
             key={active?.id ?? "empty"}
             initialMessages={initialMessages}

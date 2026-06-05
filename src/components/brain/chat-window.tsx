@@ -101,7 +101,7 @@ export function ChatWindow({
         </div>
       ) : null}
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div ref={scrollRef} className="space-y-4 p-4">
           {messages.length === 0 ? (
             <div className="rounded-md border border-dashed border-slate-800 p-6 text-center text-sm text-slate-500">
